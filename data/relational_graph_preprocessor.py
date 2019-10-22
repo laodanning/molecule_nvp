@@ -18,6 +18,14 @@ def get_adj_info(mol):
     adj_info = map(lambda b:(b.GetBeginAtomIdx(), b.GetEndAtomIdx(), b.GetBondTypeAsDouble()), bonds)
     return adj_info
 
+def construct_atom_id_array_func(id_to_atomic_num: list):
+    def construct_atom_id_array(mol, out_size=-1):
+        atomic_num_array = construct_atomic_number_array(mol, out_size)
+        atom_id_array = np.zeros(atomic_num_array.shape, dtype=np.float32)
+        for i in range(atomic_num_array.shape[0]):
+            atom_id_array[i] = id_to_atomic_num.index(atomic_num_array[i])
+        return atom_id_array
+    return construct_atom_id_array
 
 def construct_discrete_edge_matrix(mol, out_size=-1, kekulize=False):
     """construct adjacency tensor. In addition to NxN adjacency matrix,
@@ -82,7 +90,7 @@ class RelationalGraphPreprocessor(MolPreprocessor):
         kekulize (bool): If True, Kekulizes the molecule.
     """
 
-    def __init__(self, max_atoms=-1, out_size=-1, add_Hs=False, kekulize=False):
+    def __init__(self, max_atoms=-1, out_size=-1, add_Hs=False, id_to_atomic_num=None, kekulize=False):
         super(RelationalGraphPreprocessor, self).__init__(add_Hs=add_Hs, kekulize=kekulize)
         if max_atoms >= 0 and 0 <= out_size < max_atoms:
             raise ValueError('max_atoms {} must be less or equal to '
@@ -90,6 +98,11 @@ class RelationalGraphPreprocessor(MolPreprocessor):
         self.max_atoms = max_atoms
         self.out_size = out_size
         self.kekulize = kekulize
+        self.id_to_atomic_num = id_to_atomic_num
+        if id_to_atomic_num is None:
+            self.atom_feature_func = construct_atomic_number_array
+        else:
+            self.atom_feature_func = construct_atom_id_array_func(id_to_atomic_num)
 
     def get_input_features(self, mol):
         """get input features
@@ -99,7 +112,7 @@ class RelationalGraphPreprocessor(MolPreprocessor):
             input features
         """
         type_check_num_atoms(mol, self.max_atoms)
-        atom_array = construct_atomic_number_array(mol, out_size=self.out_size)
+        atom_array = self.atom_feature_func(mol, out_size=self.out_size)
         adj_tensor = construct_discrete_edge_matrix(mol, out_size=self.out_size, kekulize=self.kekulize)
         return (atom_array, adj_tensor)
 

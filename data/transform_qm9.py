@@ -20,12 +20,3 @@ def transform_fn(data):
     adj = np.concatenate([adj[:3], 1 - np.sum(adj[:3], axis=0, keepdims=True)],
                          axis=0).astype(np.float32)
     return node, adj, label
-
-
-def get_val_ids():
-    file_path = 'data/valid_idx_qm9.json'
-    print('loading train/valid split information from: {}'.format(file_path))
-    with open(file_path) as json_data:
-        data = json.load(json_data)
-    val_ids = [int(idx)-1 for idx in data['valid_idxs']]
-    return val_ids

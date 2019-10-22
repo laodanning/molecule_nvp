@@ -4,6 +4,9 @@ import chainer.functions as F
 from chainer_chemistry import MAX_ATOMIC_NUM
 from chainer_chemistry.links import EmbedAtomID
 from chainer_chemistry.links import GraphLinear
+from model.utils import get_and_log
+import json
+import os
 
 def rescale_adj(adj):
     """Rescale the adjacency matrix
@@ -70,24 +73,90 @@ class AtomEmbedRGCNUpdate(chainer.Chain):
         return hr + hs
 
 
-class AtomEmbedRGCNReadout(chainer.Chain):
-
-    def __init__(self, in_channel, out_channel, nobias=True):
-        super(AtomEmbedRGCNReadout, self).__init__()
-        with self.init_scope():
-            pass
-
-
 class AtomEmbedRGCN(chainer.Chain):
     """Implementation for R-GCN used for atom embedding training
     """
 
     def __init__(self, word_size, num_atom_type=MAX_ATOMIC_NUM, num_edge_type=4,
-                 ch_list=None, activation=F.relu):
+                 ch_list=None, scale_adj=False, activation=F.relu):
         super(AtomEmbedRGCN, self).__init__()
         
         self.ch_list = [word_size]
         if not ch_list is None:
             self.ch_list.extend(ch_list)
-        self.ch_list.append(num_atom_type)
+        # self.ch_list.append(num_atom_type)
+
+        with self.init_scope():
+            self.rgcn_convs = chainer.ChainList(*[
+                AtomEmbedRGCNUpdate(ch_list[i], ch_list[i+1], num_edge_type) \
+                for i in range(len(ch_list)-1)])
+            self.rgcn_out = AtomEmbedRGCNUpdate(ch_list[-1], num_atom_type, num_edge_type)
+        
+        self.num_atom_type = num_atom_type
+        self.num_edge_type = num_edge_type
         self.activation = activation
+        self.scale_adj = scale_adj
+
+    def __call__(self, x, adj):
+        """
+        Args:
+            x: (batchsize, num_nodes, word_size)
+            adj: (batchsize, num_edge_type, num_node, num_nodes)
+
+        Returns: (batchsize, num_nodes, num_atom_type)
+        """
+        h = x
+        if self.scale_adj:
+            adj = rescale_adj(adj)
+        for rgcn_conv in self.rgcn_convs:
+            h = self.activation(rgcn_conv(h, adj))
+        h = F.softmax(self.rgcn_out(h, adj))
+        return h
+    
+class AtomEmbedModel(chainer.Chain):
+    def __init__(self, word_size, num_atom_type=MAX_ATOMIC_NUM, num_edge_type=4,
+                 ch_list=None, scale_adj=False, activation=F.relu):
+        super(AtomEmbedModel, self).__init__()
+        with self.init_scope():
+            self.embed = AtomEmbed(word_size, num_atom_type)
+            self.rgcn = AtomEmbedRGCN(word_size, num_atom_type, 
+                                      num_edge_type, ch_list, 
+                                      scale_adj, activation)
+        self.word_size = word_size
+        self.num_atom_type = num_atom_type
+        self.num_edge_type = num_edge_type
+        self.ch_list = ch_list
+        self.scale_adj = scale_adj
+    
+    def __call__(self, x, adj):
+        words = self.embed(x)
+        h = self.rgcn(words, adj)
+        return h
+
+    def save_hyperparameters(self, config):
+        out_dir = get_and_log(config, "out_dir", "./output")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "hyperparameters.json"), "w", encoding="utf-8") as f:
+            json.dump(config, f) 
+
+
+if __name__ == "__main__":
+    import numpy as np
+
+    batch_size = 5
+    nodes = 9
+    num_atom_type = 5
+    num_edge_type = 4
+    word_size = 8
+
+    adj = np.random.randint(0, high=2, size=(batch_size, num_edge_type, nodes, nodes)).astype(np.float32)
+    x = np.random.randint(0, high=num_atom_type, size=(batch_size, nodes))
+
+    embed_layer = AtomEmbed(word_size, num_atom_type)
+    rgcn = AtomEmbedRGCN(word_size, num_atom_type, num_edge_type, [8, 16], True)
+
+    print("in size: ", x.shape, adj.shape)
+    words = embed_layer(x)
+    print("word size: ", words.shape)
+    out = rgcn(words, adj)
+    print("out size: ", out.shape)
