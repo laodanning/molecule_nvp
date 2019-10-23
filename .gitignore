@@ -100,5 +100,14 @@ ENV/
 # mypy
 .mypy_cache/
 .idea/
+
+# data output
 data/models/
 dataset/
+output/
+
+# dev test
+dev_test.py
+
+# vscode
+.vscode/
