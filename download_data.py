@@ -48,10 +48,11 @@ os.makedirs(data_dir, exist_ok=True)
 print("Save dataset '{}' with format '{}' in '{}' as '{}'".format(data_name, data_type, data_dir, dataset_name))
 
 if data_name == 'qm9':
-    dataset = get_qm9(preprocessor, target_index=[1,2,3,4,5])
+    dataset = get_qm9(preprocessor)
 # elif data_name == 'zinc250k':
 #     dataset = datasets.get_zinc250k(preprocessor)
 else:
     raise ValueError("[ERROR] Unexpected value data_name={}".format(data_name))
 
+# format: (x, adj)
 NumpyTupleDataset.save(os.path.join(data_dir, dataset_name), dataset)

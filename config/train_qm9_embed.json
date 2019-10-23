@@ -3,7 +3,7 @@
     "dataset_dir": "./dataset",
     "train_validation_split": "validation_idx_qm9.json",
     "atom_id_to_atomic_num": "atomic_num_qm9.json",
-    "dataset": "qm9_relgraph.npz",
+    "dataset": "qm9_relgraph_kekulized.npz",
     "out_dir": "./output/qm9",
     "device": 0,
 
@@ -11,11 +11,12 @@
     "molecule_size": 9,
     "num_atom_type": 5,
     "kekulize": true,
-    "layers": [16, 32, 64],
+    "layers": [8],
     "scale_adj": true,
 
     "num_epoch": 2,
-    "batch_size": 2,
+    "save_epoch": 1,
+    "batch_size": 512,
     "optimizer": "adam",
-    "log": "stdout"
+    "log_name": "train_log"
 }

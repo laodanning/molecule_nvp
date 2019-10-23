@@ -4,10 +4,14 @@ import logging as log
 import os
 
 import chainer
-from chainer_chemistry.datasets import NumpyTypleDataset
+from chainer import training
+from chainer.training import extensions
+from chainer_chemistry.datasets import NumpyTupleDataset
 
 from data.utils import get_validation_idxs
 from model.atom_embed.atom_embed import AtomEmbed, AtomEmbedRGCN, AtomEmbedModel
+from model.updaters import AtomEmbedUpdater
+from model.evaluators import AtomEmbedEvaluator
 from model.utils import get_and_log, get_optimizer
 
 
@@ -19,6 +23,7 @@ def load_config(path):
         raise ValueError("Cannot find configuration file {}.".format(path))
 
 def train(config):
+    # -- read hyperparameters --
     log.info("Hyper-parameters:")
     device = get_and_log(config, "device", -1)
     out_dir = get_and_log(config, "out_dir", "./output")
@@ -32,16 +37,25 @@ def train(config):
     word_size = get_and_log(config, "embed_word_size", required=True)
     molecule_size = get_and_log(config, "molecule_size", required=True)
     num_atom_type = get_and_log(config, "num_atom_type", required=True)
+    save_epoch = get_and_log(config, "save_epoch", -1)
     kekulized = get_and_log(config, "kekulize", False)
     layers = get_and_log(config, "layers", required=True)
     scale_adj = get_and_log(config, "scale_adj", True)
-    log_path = get_and_log(config, "log", "stdout")
+    log_name = get_and_log(config, "log_name", "log")
     optimizer_type = get_and_log(config, "optimizer", "adam")
     optimizer_params = get_and_log(config, "optimizer_params")
+    snapshot = get_and_log(config, "snapshot")
     num_edge_type = 4 if kekulized else 5
+    
+    os.makedirs(out_dir, exist_ok=True)
 
-    validation_idxs = get_validation_idxs(validation_idxs_filepath)
-    dataset = NumpyTypleDataset.load(os.path.join(dataset_dir, dataset_name))
+    if validation_idxs_filepath is not None:
+        validation_idxs = get_validation_idxs(os.path.join(config_dir, validation_idxs_filepath))
+    else:
+        validation_idxs = None
+
+    # -- build dataset --
+    dataset = NumpyTupleDataset.load(os.path.join(dataset_dir, dataset_name))
     if validation_idxs:
         train_idxs = [i for i in range(len(dataset)) if i not in validation_idxs]
         trainset_size = len(train_idxs)
@@ -50,29 +64,43 @@ def train(config):
     else:
         trainset, testset = chainer.datasets.split_dataset_random(dataset, int(len(dataset) * 0.8), seed=777)
     
-    train_iter = chainer.iterators.SerialIterator(trainset, batch_size)
+    train_iter = chainer.iterators.SerialIterator(trainset, batch_size, shuffle=True)
+    test_iter = chainer.iterators.SerialIterator(testset, batch_size, repeat=False, shuffle=False)
     
+    # -- model --
     model = AtomEmbedModel(word_size, num_atom_type, num_edge_type,
                            layers, scale_adj)
     model.save_hyperparameters(config)
     
+    # -- training details --
     if device >= 0:
         log.info("Using GPU")
         chainer.cuda.get_device(device).use()
         model.to_gpu(device)
 
-    model_save_dir = os.path.join(out_dir, "models")
-    os.makedirs(model_save_dir, exist_ok=True)
-
-    opt_func = get_optimizer()
+    opt_func = get_optimizer(optimizer_type)
     if optimizer_params is not None:
         optimizer = opt_func(optimizer_params)
     else:
         optimizer = opt_func()
     
     optimizer.setup(model)
-    updater = chainer.iterators.SerialIterator()
+    updater = AtomEmbedUpdater(train_iter, optimizer, device=device)
+    trainer = training.Trainer(updater, (num_epoch, "epoch"), out=out_dir)
+    save_epoch = save_epoch if save_epoch >= 0 else num_epoch
     
+    # -- trainer extension --
+    trainer.extend(extensions.snapshot, trigger=(save_epoch, "epoch"))
+    trainer.extend(extensions.LogReport(filename=log_name))
+    trainer.extend(AtomEmbedEvaluator(test_iter, model, reporter=trainer.reporter, device=device))
+    trainer.extend(extensions.PrintReport(["epoch", "ce_loss", "accuracy", "validation/ce_loss", "validation/accuracy", "elapsed_time"]))
+    trainer.extend(extensions.PlotReport(["ce_loss", "validation/ce_loss"], x_key="epoch", filename="cross_entrypy_loss.png"))
+    trainer.extend(extensions.PlotReport(["accuracy", "validation/accuracy"], x_key="epoch", filename="accuracy.png"))
+
+    if snapshot is not None:
+        chainer.serializers.load_npz(snapshot, trainer)
+    trainer.run()
+    chainer.serializers.save_npz(os.path.join(out_dir, "final_embed_model.npz"), model.embed)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

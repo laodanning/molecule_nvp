@@ -41,6 +41,7 @@ class AtomEmbed(chainer.Chain):
         self.id_trans_fn = id_trans_fn
         
     def __call__(self, x):
+        x = F.cast(x, "int")
         if self.id_trans_fn is None:
             words = self.embed(x)
         else:
@@ -88,9 +89,9 @@ class AtomEmbedRGCN(chainer.Chain):
 
         with self.init_scope():
             self.rgcn_convs = chainer.ChainList(*[
-                AtomEmbedRGCNUpdate(ch_list[i], ch_list[i+1], num_edge_type) \
-                for i in range(len(ch_list)-1)])
-            self.rgcn_out = AtomEmbedRGCNUpdate(ch_list[-1], num_atom_type, num_edge_type)
+                AtomEmbedRGCNUpdate(self.ch_list[i], self.ch_list[i+1], num_edge_type) \
+                for i in range(len(self.ch_list)-1)])
+            self.rgcn_out = AtomEmbedRGCNUpdate(self.ch_list[-1], num_atom_type, num_edge_type)
         
         self.num_atom_type = num_atom_type
         self.num_edge_type = num_edge_type
@@ -110,7 +111,7 @@ class AtomEmbedRGCN(chainer.Chain):
             adj = rescale_adj(adj)
         for rgcn_conv in self.rgcn_convs:
             h = self.activation(rgcn_conv(h, adj))
-        h = F.softmax(self.rgcn_out(h, adj))
+        h = self.rgcn_out(h, adj)
         return h
     
 class AtomEmbedModel(chainer.Chain):
@@ -137,7 +138,7 @@ class AtomEmbedModel(chainer.Chain):
         out_dir = get_and_log(config, "out_dir", "./output")
         os.makedirs(out_dir, exist_ok=True)
         with open(os.path.join(out_dir, "hyperparameters.json"), "w", encoding="utf-8") as f:
-            json.dump(config, f) 
+            json.dump(config, f, indent=4, separators=(',', ': ')) 
 
 
 if __name__ == "__main__":

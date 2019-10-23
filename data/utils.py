@@ -2,6 +2,7 @@ import numpy as np
 import json
 import os
 import logging as lg
+import chainer
 
 def get_validation_idxs(file_path):
     lg.info("loading train/validation split information from {}".format(file_path))
@@ -33,5 +34,9 @@ def get_atomic_num_id(file_path):
         raise ValueError("Cannot find atomid to atomic number information file in {}".format(file_path))
     return data
 
-def trans_fn(data):
-    pass
+@chainer.dataset.converter()
+def molecule_id_converter(batch, device):
+    """Convert float atom feature(atom id or atomic number) to int
+    """
+    batch = chainer.dataset.concat_examples(batch, device)
+    return (chainer.functions.cast(batch[0], "int"), batch[1])
