@@ -37,7 +37,7 @@ class RelationalGAT(chainer.Chain):
 
     """
     def __init__(self, out_dim, hidden_dim, n_heads=3, 
-                 negative_slope=0.2,n_edge_types=4, n_layers=4, 
+                 negative_slope=0.2, n_edge_types=4, n_layers=4, 
                  dropout_ratio=-1, activation=F.tanh,
                  softmax_mode="across", concat_hidden=False,
                  concat_heads=False, weight_tying=False):
