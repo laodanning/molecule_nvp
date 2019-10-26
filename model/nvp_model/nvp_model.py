@@ -1,0 +1,132 @@
+import chainer
+import chainer.links as L
+import chainer.functions as F
+
+from model.hyperparameter import NVPHyperParameter
+from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
+    AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
+
+
+class AttentionNvpModel(chainer.Chain):
+    def __init__(self, hyperparams: NVPHyperParameter = None):
+        super(AttentionNvpModel, self).__init__()
+        self.hyperparams = hyperparams if hyperparams is not None else NVPHyperParameter()
+        self.masks = dict()
+        self.masks["relation"] = self._create_masks("relation")
+        self.masks["feature"] = self._create_masks("feature")
+        self.adj_size = self.hyperparams.num_nodes * \
+            self.hyperparams.num_nodes * self.hyperparams.num_edge_types
+        self.x_size = self.hyperparams.num_nodes * self.hyperparams.num_features
+
+        with self.init_scope():
+            if self.hyperparams.learn_dist:
+                self.ln_var = chainer.Parameter(initializer=0., shape=[1])
+            else:
+                self.ln_var = chainer.Variable(initializer=0., shape=[1])
+
+            feature_coupling = AdditiveNodeFeatureCoupling if self.hyperparams.additive_feature_coupling else AffineNodeFeatureCoupling
+            relation_coupling = AdditiveAdjCoupling if self.hyperparams.additive_relation_coupling else AffineAdjCoupling
+            clinks = [
+                feature_coupling(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features,
+                                 self.masks["feature"][i % self.hyperparams.num_features],
+                                 batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.gnn_channels,
+                                 n_attention=self.hyperparams.num_attention_types, gat_layers=self.hyperparams.num_gat_layers)
+                for i in range(self.hyperparams.num_coupling["feature"])]
+            clinks.extend([
+                relation_coupling(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features,
+                                  self.masks["relation"][i % self.hyperparams.num_edge_types],
+                                  batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.mlp_channels)
+                for i in range(self.hyperparams.num_coupling["relation"])])
+            self.clinks = chainer.ChainList(*clinks)
+
+    def __call__(self, x, adj):
+        h = chainer.as_variable(x)
+
+        # add uniform noise to node feature matrices
+        if chainer.config.train:
+            h += self.xp.random.uniform(0, 0.9, x.shape)
+
+        adj = chainer.as_variable(adj)
+        sum_log_det_jacobian_x = chainer.as_variable(
+            self.xp.zeros([h.shape[0]], dtype=self.xp.float32))
+        sum_log_det_jacobian_adj = chainer.as_variable(
+            self.xp.zeros([h.shape[0]], dtype=self.xp.float32))
+
+        # forward step for channel-coupling layers
+        for i in range(self.hyperparams.num_coupling["feature"]):
+            h, log_det_jacobians = self.clinks[i](h, adj)
+            sum_log_det_jacobian_x += log_det_jacobians
+
+        # add uniform noise to adjacency tensors
+        if chainer.config.train:
+            adj += self.xp.random.uniform(0, 0.9, adj.shape)
+
+        # forward step for adjacency-coupling layers
+        for i in range(self.hyperparams.num_coupling["relation"], len(self.clinks)):
+            adj, log_det_jacobians = self.clinks[i](adj)
+            sum_log_det_jacobian_adj += log_det_jacobians
+
+        adj = F.reshape(adj, (adj.shape[0], -1))
+        h = F.reshape(h, (h.shape[0], -1))
+        out = [h, adj]
+        return out, (sum_log_det_jacobian_x, sum_log_det_jacobian_adj)
+
+    def reverse(self, z, true_adj=None):
+        """
+        Returns a molecule, given its latent vector.
+        :param z: latent vector. Shape: [B, N*N*M + N*T]
+            B = Batch size, N = number of atoms, M = number of bond types,
+            T = number of atom types (Carbon, Oxygen etc.)
+        :param true_adj: used for testing. An adjacency matrix of a real molecule
+        :return: adjacency matrix and feature matrix of a molecule
+        """
+        batch_size = z.shape[0]
+        with chainer.no_backprop_mode():
+            z_x, z_adj = F.split_axis(chainer.as_variable(z), [self.x_size], 1)
+
+            if true_adj is None:
+                h_adj = F.reshape(z_adj, (batch_size, self.hyperparams.num_edge_types,
+                                          self.hyperparams.num_nodes, self.hyperparams.num_nodes))
+
+                # First, the adjacency coupling layers are applied in reverse order to get h_adj
+                for i in reversed(range(self.hyperparams.num_coupling["feature"], len(self.clinks))):
+                    h_adj, _ = self.clinks[i].reverse(h_adj)
+
+                # make adjacency matrix from h_adj
+                # 1. make it symmetric
+                adj = h_adj + self.xp.transpose(h_adj, (0, 1, 3, 2))
+                adj = adj / 2
+                # 2. apply normalization along edge type axis
+                adj = F.softmax(adj, axis=1)
+                max_bond = F.broadcast_to(
+                    F.max(adj, axis=1, keepdims=True), shape=adj.shape)
+                adj = adj // max_bond
+            else:
+                adj = true_adj
+
+            h_x = F.reshape(
+                z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
+
+            # feature coupling layers
+            for i in reversed(range(self.hyperparams.num_coupling["feature"])):
+                h_x, _ = self.clinks[i].reverse(h_x, adj)
+
+        return h_x, adj
+
+    def log_prob(self, z, log_det_jacobians):
+        pass
+
+    def _create_masks(self, channel):
+        if channel == "relation":  # for adjacenecy matrix
+            return self._simple_masks(self.hyperparams.num_edge_types)
+        elif channel == "feature":  # for feature matrix
+            return self._simple_masks(self.hyperparams.num_features)
+
+    def _simple_masks(self, N):
+        return ~self.xp.eye(N, dtype=self.xp.bool)
+
+    def save_hyperparams(self, path):
+        self.hyperparams.save(path)
+
+    def load_hyperparams(self, path):
+        self.hyperparams.load(path)

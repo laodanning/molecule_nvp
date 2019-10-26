@@ -1,0 +1,15 @@
+{
+    "num_edge_type": 4,
+    "num_feature": 8,
+    "num_node": 9,
+    "apply_batchnorm": true,
+    "num_coupling":
+    {
+        "feature": 8,
+        "relation": 4
+    },
+    "num_attention_types": 4,
+    "num_gat_layers": 4,
+    "gnn_channels": [8, 8],
+    "mlp_channels": [8, 8]
+}
