@@ -30,6 +30,10 @@ class Coupling(chainer.Chain):
 
 
 class AffineAdjCoupling(Coupling):
+    """
+    Mask of adjacency matrix: a boolean ndarray with size (R,)
+    """
+
     def __init__(self, n_nodes, n_relations, n_features,
                  mask, batch_norm=False, ch_list=None):
         super(AffineAdjCoupling, self).__init__(
@@ -37,6 +41,7 @@ class AffineAdjCoupling(Coupling):
         self.ch_list = ch_list
         self.out_size = n_nodes * n_nodes
         self.in_size = self.adj_size - self.out_size
+        self.cal_mask = self.mask.reshape(n_relations, 1, 1)
 
         with self.init_scope():
             self.mlp = MLP(ch_list, in_size=self.in_size, activation=F.relu)
@@ -51,11 +56,13 @@ class AffineAdjCoupling(Coupling):
         masked_adj = adj[:, self.mask]
         log_s, t = self._s_t_functions(masked_adj)
         s = F.sigmoid(log_s + 2)
-        cal_t = F.broadcast_to(t, adj.shape)
-        cal_s = F.broadcast_to(s, adj.shape)
-        adj = adj * self.mask + adj * \
-            (cal_s * ~self.mask) + cal_t * (~self.mask)
-        log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=(1, 2))
+        log_det_jacobian = F.sum(F.log(F.absolute(s)),
+                                 axis=(2, 3)).reshape(adj.shape[0])
+
+        t = F.broadcast_to(t, adj.shape)
+        s = F.broadcast_to(s, adj.shape)
+        adj = adj * self.cal_mask + adj * \
+            (s * ~self.cal_mask) + t * (~self.cal_mask)
         return adj, log_det_jacobian
 
     def reverse(self, adj):
@@ -64,7 +71,7 @@ class AffineAdjCoupling(Coupling):
         s = F.sigmoid(log_s + 2)
         t = F.broadcast_to(t, adj.shape)
         s = F.broadcast_to(s, adj.shape)
-        adj = adj * self.mask + ((adj - t) / s) * (~self.mask)
+        adj = adj * self.cal_mask + ((adj - t) / s) * (~self.cal_mask)
         return adj, None
 
     def _s_t_functions(self, adj):
@@ -89,6 +96,7 @@ class AdditiveAdjCoupling(Coupling):
         self.ch_list = ch_list
         self.out_size = n_nodes * n_nodes
         self.in_size = self.adj_size - self.out_size
+        self.cal_mask = self.mask.reshape(n_relations, 1, 1)
 
         with self.init_scope():
             self.mlp = MLP(ch_list, in_size=self.in_size, activation=F.relu)
@@ -110,7 +118,7 @@ class AdditiveAdjCoupling(Coupling):
         masked_adj = adj[:, self.mask]
         t = self._s_t_functions(masked_adj)
         t = F.broadcast_to(t, adj.shape)
-        adj += t * (~self.mask)
+        adj += t * (~self.cal_mask)
 
         return adj, chainer.Variable(self.xp.array(0., dtype="float32"))
 
@@ -118,7 +126,7 @@ class AdditiveAdjCoupling(Coupling):
         masked_adj = adj[:, self.mask]
         t = self._s_t_functions(masked_adj)
         t = F.broadcast_to(t, adj.shape)
-        adj -= t * (~self.mask)
+        adj -= t * (~self.cal_mask)
         return adj, None
 
     def _s_t_functions(self, adj):
@@ -133,31 +141,57 @@ class AdditiveAdjCoupling(Coupling):
 
 
 class AffineNodeFeatureCoupling(Coupling):
+    """
+    Mask of adjacency matrix: a boolean ndarray with size (F,)
+    """
+
     def __init__(self, n_nodes, n_relations, n_features, mask,
-                 batch_norm=False, n_masked=1, ch_list=None, n_attention=4, gat_layers=4):
+                 batch_norm=False, ch_list=None, n_attention=4, gat_layers=4):
         super().__init__(n_nodes, n_relations, n_features, mask, batch_norm=batch_norm)
-        self.n_masked = n_masked
         self.ch_list = ch_list
-        self.out_size = n_nodes * n_masked
+        self.out_size = n_nodes
         with self.init_scope():
             self.rgat = RelationalGAT(
-                out_dim=ch_list[0], n_edge_types=n_relations, 
+                out_dim=ch_list[0], n_edge_types=n_relations,
                 n_heads=n_attention, hidden_dim=n_features, n_layers=gat_layers)
             self.linear1 = L.linear(ch_list[0], out_size=ch_list[1])
-            self.linear2 = L.Linear(ch_list[1], out_size=2*self.out_size, initialW=1e-10)
+            self.linear2 = L.Linear(
+                ch_list[1], out_size=2*self.out_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0, shape=[1])
             self.batch_norm = L.BatchNormalization(ch_list[0])
-    
+
     def __call__(self, x, adj):
-        masked_x = self.mask * x
+        masked_x = self.mask * x  # same shape as x
+        batch_size = x.shape[0]
+
         s, t = self._s_t_functions(masked_x, adj)
+        s = F.sigmoid(s + 2)
+        log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=1)
+
+        t = F.reshape(t, [batch_size, self.out_size, 1])
+        t = F.broadcast_to(t, [batch_size, self.out_size, self.n_features])
+        s = F.reshape(s, [batch_size, self.out_size, 1])
+        s = F.broadcast_to(s, [batch_size, self.out_size, self.n_features])
+
         x = masked_x + x * (s * ~self.mask) + t * ~self.mask
-        log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=(1, 2))
         return x, log_det_jacobian
+
+    def reverse(self, z, adj):
+        masked_z = self.mask * z
+        batch_size = z.shape[0]
+        s, t = self._s_t_functions(masked_z, adj)
+        s = F.sigmoid(s + 2)
+
+        t = F.reshape(t, [batch_size, self.out_size, 1])
+        t = F.broadcast_to(t, [batch_size, self.out_size, self.n_features])
+        s = F.reshape(s, [batch_size, self.out_size, 1])
+        s = F.broadcast_to(s, [batch_size, self.out_size, self.n_features])
+        out = masked_z + ((z - t) / s) * (~self.mask)
+
+        return out, None
 
     def _s_t_functions(self, x, adj):
         y = self.rgat(x, adj)
-        batch_size = x.shape[0]
         if self.apply_bn:
             y = self.batch_norm(y)
         y = self.linear1(y)
@@ -165,6 +199,50 @@ class AffineNodeFeatureCoupling(Coupling):
         y = self.linear2(y) * F.exp(self.scale_factor * 2)
         s = y[:, :self.out_size]
         t = y[:, self.out_size:]
-        s = F.sigmoid(s + 2)
 
-        t = F.reshape(t, [batch_size, 1, self.out_size])
+        return s, t
+
+
+class AdditiveNodeFeatureCoupling(Coupling):
+    def __init__(self, n_nodes, n_relations, n_features, mask,
+                 batch_norm=False, ch_list=None, n_attention=4, gat_layers=4):
+        super().__init__(n_nodes, n_relations, n_features, mask, batch_norm=batch_norm)
+        self.ch_list = ch_list
+        self.out_size = n_nodes
+        with self.init_scope():
+            self.rgat = RelationalGAT(
+                out_dim=ch_list[0], n_edge_types=n_relations,
+                n_heads=n_attention, hidden_dim=n_features, n_layers=gat_layers)
+            self.linear1 = L.linear(ch_list[0], out_size=ch_list[1])
+            self.linear2 = L.Linear(
+                ch_list[1], out_size=2*self.out_size, initialW=1e-10)
+            self.scale_factor = chainer.Parameter(initializer=0, shape=[1])
+            self.batch_norm = L.BatchNormalization(ch_list[0])
+
+    def __call__(self, x, adj):
+        masked_x = self.mask * x
+        batch_size = x.shape[0]
+        t = self._s_t_functions(masked_x, adj)
+        t = F.reshape(t, [batch_size, self.out_size, 1])
+        t = F.broadcast_to(t, [batch_size, self.out_size, self.n_features])
+        x += t * (~self.mask)
+        return x, chainer.Variable(self.xp.array(0., dtype="float32"))
+
+    def reverse(self, z, adj):
+        masked_z = self.mask * z
+        batch_size = z.shape[0]
+        t = self._s_t_functions(masked_z, adj)
+        t = F.reshape(t, [batch_size, self.out_size, 1])
+        t = F.broadcast_to(t, [batch_size, self.out_size, self.n_features])
+        z -= t * (~self.mask)
+        return z, None
+
+    def _s_t_functions(self, x, adj):
+        y = self.rgat(x, adj)
+        if self.apply_bn:
+            y = self.batch_norm(y)
+        y = self.linear1(y)
+        y = F.tanh(y)
+        y = self.linear2(y) * F.exp(self.scale_factor * 2)
+
+        return y
