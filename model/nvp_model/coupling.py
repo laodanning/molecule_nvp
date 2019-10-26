@@ -3,8 +3,8 @@ import chainer.backends.cuda as cuda
 import chainer.functions as F
 import chainer.links as L
 
-from model.rnvp_model.mlp import MLP
-from model.rnvp_model.gat import RelationalGAT
+from model.nvp_model.mlp import MLP
+from model.nvp_model.gat import RelationalGAT
 
 
 class Coupling(chainer.Chain):
