@@ -96,10 +96,9 @@ class AttentionNvpModel(chainer.Chain):
                 # 1. make it symmetric
                 adj = h_adj + self.xp.transpose(h_adj, (0, 1, 3, 2))
                 adj = adj / 2
-                # 2. apply normalization along edge type axis
+                # 2. apply normalization along edge type axis and choose the most likely edge type.
                 adj = F.softmax(adj, axis=1)
-                max_bond = F.broadcast_to(
-                    F.max(adj, axis=1, keepdims=True), shape=adj.shape)
+                max_bond = F.broadcast_to(F.max(adj, axis=1, keepdims=True), shape=adj.shape)
                 adj = adj // max_bond
             else:
                 adj = true_adj
@@ -114,7 +113,13 @@ class AttentionNvpModel(chainer.Chain):
         return h_x, adj
 
     def log_prob(self, z, log_det_jacobians):
-        pass
+        ln_var_adj = self.ln_var * self.xp.ones([self.adj_size])
+        ln_var_x = self.ln_var * self.xp.ones([self.x_size])
+        
+        negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(self.adj_size, dtype=self.xp.float32), ln_var_adj, reduce="no"), axis=1) - log_det_jacobians[1])
+        negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros([self.x_size], dtype=self.xp.float32), ln_var_x, reduce="no"), axis=1) - log_det_jacobians[0])
+
+        return [negative_log_likelihood_x, negative_log_likelihood_adj]
 
     def _create_masks(self, channel):
         if channel == "relation":  # for adjacenecy matrix
