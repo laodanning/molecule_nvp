@@ -6,7 +6,9 @@ import logging as log
 
 class Hyperparameter(object):
     def __init__(self, path=None):
-        self.path = None
+        self.path = path
+        if path is not None:
+            self.parse()
 
     def parse(self):
         if self.path is None or not os.path.exists(self.path):
@@ -38,3 +40,18 @@ class Hyperparameter(object):
         for k, v in self.__dict__.items():
             rows.append([k, v])
         print(tabulate(rows))
+    
+    def has(self, attr_name):
+        return hasattr(self, attr_name)
+
+class NVPHyperParameter(Hyperparameter):
+    def __init__(self, path=None):
+        self.num_nodes = 9
+        self.num_edge_types = 4
+        self.num_features = 8
+        self.learn_dist = True
+        self.additive_feature_coupling = True
+        self.additive_relation_coupling = False
+        self.apply_batchnorm = True
+
+        super().__init__(path=path)
