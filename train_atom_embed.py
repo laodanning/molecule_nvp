@@ -70,7 +70,7 @@ def train(config):
     # -- model --
     model = AtomEmbedModel(word_size, num_atom_type, num_edge_type,
                            layers, scale_adj)
-    model.save_hyperparameters(config)
+    model.save_hyperparameters(os.path.join(out_dir, "atom_embed_model_hyper.json"))
     
     # -- training details --
     if device >= 0:
