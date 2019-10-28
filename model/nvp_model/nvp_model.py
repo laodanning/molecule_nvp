@@ -2,6 +2,7 @@ import chainer
 import chainer.links as L
 import chainer.functions as F
 
+from model.atom_embed.atom_embed import atom_embed_model
 from model.hyperparameter import Hyperparameter
 from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
     AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
@@ -17,8 +18,11 @@ class AttentionNvpModel(chainer.Chain):
         self.adj_size = self.hyperparams.num_nodes * \
             self.hyperparams.num_nodes * self.hyperparams.num_edge_types
         self.x_size = self.hyperparams.num_nodes * self.hyperparams.num_features
+        assert hasattr(self.hyperparams, "embed_model_path") and hasattr(self.hyperparams, "embed_model_hyper")
 
         with self.init_scope():
+            self.embed_model = atom_embed_model(Hyperparameter(hyperparams.embed_model_hyper))
+            assert self.embed_model.word_size == self.hyperparams.num_features
             if self.hyperparams.learn_dist:
                 self.ln_var = chainer.Parameter(initializer=0., shape=[1])
             else:
@@ -39,12 +43,17 @@ class AttentionNvpModel(chainer.Chain):
                 for i in range(self.hyperparams.num_coupling["relation"])])
             self.clinks = chainer.ChainList(*clinks)
 
-    def __call__(self, x, adj):
-        h = chainer.as_variable(x)
+        # load and fix embed model
+        chainer.serializers.load_npz(self.hyperparams.embed_model_path, self.embed_model)
+        self.embed_model.disable_update()
 
+    def __call__(self, x, adj):
+        # x (batch_size, ): atom id array
+        h = chainer.as_variable(x)
+        h = self.embed_model.embedding(h)
         # add uniform noise to node feature matrices
         if chainer.config.train:
-            h += self.xp.random.uniform(0, 0.9, x.shape)
+            h += self.xp.random.uniform(0, 0.9, h.shape)
 
         adj = chainer.as_variable(adj)
         sum_log_det_jacobian_x = chainer.as_variable(
@@ -109,8 +118,10 @@ class AttentionNvpModel(chainer.Chain):
             # feature coupling layers
             for i in reversed(range(self.hyperparams.num_coupling["feature"])):
                 h_x, _ = self.clinks[i].reverse(h_x, adj)
+            
+            atom_ids = self.embed_model.atomid(h_x, adj)
 
-        return h_x, adj
+        return atom_ids, adj
 
     def log_prob(self, z, log_det_jacobians):
         ln_var_adj = self.ln_var * self.xp.ones([self.adj_size])
