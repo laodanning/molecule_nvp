@@ -5,6 +5,7 @@ from chainer_chemistry import MAX_ATOMIC_NUM
 from chainer_chemistry.links import EmbedAtomID
 from chainer_chemistry.links import GraphLinear
 from model.utils import get_and_log
+from model.hyperparameter import Hyperparameter
 import json
 import os
 
@@ -140,11 +141,25 @@ class AtomEmbedModel(chainer.Chain):
     def atomid(self, words, adj):
         return F.argmax(self.rgcn(words, adj), axis=1)
 
-    def save_hyperparameters(self, config):
-        out_dir = get_and_log(config, "out_dir", "./output")
-        os.makedirs(out_dir, exist_ok=True)
-        with open(os.path.join(out_dir, "hyperparameters.json"), "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, separators=(',', ': ')) 
+    def save_hyperparameters(self, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        hyper_params = {
+            "word_size": self.word_size,
+            "num_atom_type": self.num_atom_type,
+            "num_edge_type": self.num_edge_type,
+            "ch_list": self.ch_list,
+            "scale_adj": self.scale_adj
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(hyper_params, f, indent=4, separators=(',', ': '))
+
+def atom_embed_model(hyperparams: Hyperparameter) -> AtomEmbedModel:
+    return AtomEmbedModel(
+        hyperparams.word_size, 
+        hyperparams.num_atom_type,
+        hyperparams.num_edge_type,
+        hyperparams.ch_list,
+        hyperparams.scale_adj)
 
 
 if __name__ == "__main__":
