@@ -100,7 +100,7 @@ def train(config):
     if snapshot is not None:
         chainer.serializers.load_npz(snapshot, trainer)
     trainer.run()
-    chainer.serializers.save_npz(os.path.join(out_dir, "final_embed_model.npz"), model.embed)
+    chainer.serializers.save_npz(os.path.join(out_dir, "final_embed_model.npz"), model)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
