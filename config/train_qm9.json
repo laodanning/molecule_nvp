@@ -17,6 +17,8 @@
     },
     "model":
     {
+        "embed_model_path": "./output/qm9/final_embed_model.npz",
+        "embed_model_hyper": "./output/qm9/atom_embed_model_hyper.json",
         "num_edge_type": 4,
         "num_feature": 8,
         "num_node": 9,

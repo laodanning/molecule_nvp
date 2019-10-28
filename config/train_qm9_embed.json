@@ -18,5 +18,5 @@
     "save_epoch": 1,
     "batch_size": 512,
     "optimizer": "adam",
-    "log_name": "train_log"
+    "log_name": "embed_train_log"
 }
