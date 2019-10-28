@@ -3,7 +3,6 @@ from chainer import training
 import chainer.functions as F
 from data.utils import molecule_id_converter
 from chainer import cuda
-from chainer.dataset import iterator as iterator_module
 
 
 class AtomEmbedUpdater(training.StandardUpdater):
