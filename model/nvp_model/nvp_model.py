@@ -2,15 +2,15 @@ import chainer
 import chainer.links as L
 import chainer.functions as F
 
-from model.hyperparameter import NVPHyperParameter
+from model.hyperparameter import Hyperparameter
 from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
     AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
 
 
 class AttentionNvpModel(chainer.Chain):
-    def __init__(self, hyperparams: NVPHyperParameter = None):
+    def __init__(self, hyperparams):
         super(AttentionNvpModel, self).__init__()
-        self.hyperparams = hyperparams if hyperparams is not None else NVPHyperParameter()
+        self.hyperparams = hyperparams
         self.masks = dict()
         self.masks["relation"] = self._create_masks("relation")
         self.masks["feature"] = self._create_masks("feature")
