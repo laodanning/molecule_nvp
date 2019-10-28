@@ -134,6 +134,12 @@ class AtomEmbedModel(chainer.Chain):
         h = self.rgcn(words, adj)
         return h
 
+    def embedding(self, x):
+        return self.embed(x)
+    
+    def atomid(self, words, adj):
+        return F.argmax(self.rgcn(words, adj), axis=1)
+
     def save_hyperparameters(self, config):
         out_dir = get_and_log(config, "out_dir", "./output")
         os.makedirs(out_dir, exist_ok=True)
