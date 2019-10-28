@@ -19,7 +19,10 @@ class Hyperparameter(object):
         with open(self.path, encoding="utf-8") as f:
             contents = json.load(f)
 
-        for k, v in contents.items():
+        self._parse_dict(contents)
+    
+    def _parse_dict(self, dict_obj):
+        for k, v in dict_obj.items():
             setattr(self, k, v)
 
     def load(self, path):
@@ -35,14 +38,33 @@ class Hyperparameter(object):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self.__dict__, f, indent=4, sort_keys=True)
 
-    def print(self):
+    def printself(self):
         rows = []
         for k, v in self.__dict__.items():
             rows.append([k, v])
         print(tabulate(rows))
     
+    def __str__(self):
+        rows = []
+        for k, v in self.__dict__.items():
+            rows.append([k, v])
+        return str(tabulate(rows))
+        
+    __repr__ = __str__
+    
     def has(self, attr_name):
         return hasattr(self, attr_name)
+    
+    def subparams(self, domain):
+        if hasattr(self, domain):
+            sub_params = getattr(self, domain)
+            if isinstance(sub_params, dict):
+                result = Hyperparameter()
+                result._parse_dict(sub_params)
+                return result
+        log.warning("Cannot find sub domain {} in {}".format(domain, __name__))
+        return None
+                
 
 class NVPHyperParameter(Hyperparameter):
     def __init__(self, path=None):
