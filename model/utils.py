@@ -28,18 +28,7 @@ def real_node_mask(atom_ids, virtual_atom_id):
     return atom_ids != virtual_atom_id
 
 def set_log_level(str_level: str) -> None:
-    if str_level == "debug":
-        log.basicConfig(level=log.DEBUG)
-    elif str_level == "info":
-        log.basicConfig(level=log.INFO)
-    elif str_level == "warn":
-        log.basicConfig(level=log.WARNING)
-    elif str_level == "error":
-        log.basicConfig(level=log.ERROR)
-    elif str_level == "critical":
-        log.basicConfig(level=log.CRITICAL)
-    else:
-        return
+    log.basicConfig(level=get_log_level(str_level))
     
 def get_log_level(str_level: str) -> int:
     return getattr(log, str_level.upper())

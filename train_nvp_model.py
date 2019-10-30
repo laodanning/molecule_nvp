@@ -25,17 +25,22 @@ def train(hyperparams: Hyperparameter):
     train_params = hyperparams.subparams("train")
     model_params = hyperparams.subparams("model")
     output_params = hyperparams.subparams("output")
-    set_log_level(output_params.log_level)
+    
+    os.makedirs(output_params.root_dir, exist_ok=True)
+    if hasattr(output_params, "logname"):
+        log.basicConfig(filename=os.path.join(output_params.root_dir, output_params.logname),
+                        filemode="w", level=get_log_level(output_params.log_level))
+    else:
+        log.basicConfig(level=get_log_level(output_params.log_level))
+    hyperparams.save(os.path.join(output_params.root_dir, "hyperparams.json"))
+    atomic_num_list = get_atomic_num_id(os.path.join(config_params.root_dir, config_params.atom_id_to_atomic_num))
+    device = train_params.device
+
     log.info("dataset hyperparameters:\n{}\n".format(dataset_params))
     log.info("configuration hyperparameters:\n{}\n".format(config_params))
     log.info("train hyperparameters:\n{}\n".format(train_params))
     log.info("model hyperparameters:\n{}\n".format(model_params))
     log.info("output hyperparameters:\n{}\n".format(output_params))
-
-    os.makedirs(output_params.root_dir, exist_ok=True)
-    hyperparams.save(os.path.join(output_params.root_dir, "hyperparams.json"))
-    atomic_num_list = get_atomic_num_id(os.path.join(config_params.root_dir, config_params.atom_id_to_atomic_num))
-    device = train_params.device
 
     # -- build dataset -- #
     if config_params.has("train_validation_split"):
@@ -109,11 +114,10 @@ def train(hyperparams: Hyperparameter):
 
     # -- trainer extension -- #
     trainer.extend(extensions.snapshot(), trigger=(save_epoch, "epoch"))
-    trainer.extend(extensions.LogReport(filename=output_params.logname))
+    trainer.extend(extensions.LogReport(filename=output_params.trainlogname))
     trainer.extend(print_validity, trigger=(1, "epoch"))
     trainer.extend(extensions.PrintReport([
         "epoch", "neg_log_likelihood", "nll_x", "nll_adj", "elapsed_time"]))
-    trainer.extend(extensions.LogReport())
     trainer.extend(extensions.ProgressBar())
     
     # -- start train -- #

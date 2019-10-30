@@ -13,10 +13,11 @@
     "output":
     {
         "root_dir": "./output/qm9",
-        "logname": "trainlog",
+        "trainlogname": "trainlog",
         "saved_mol_dir": "result_mol",
         "log_level": "info",
-        "final_model_name": "attention-nvp_final.npz"
+        "final_model_name": "attention-nvp_final.npz",
+        "logname": "log"
     },
     "model":
     {
