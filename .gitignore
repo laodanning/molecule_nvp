@@ -108,7 +108,7 @@ output/
 
 # dev test
 dev_test.py
-config/train_qm9_embed_test.json
+config/*test.json
 
 # vscode
 .vscode/

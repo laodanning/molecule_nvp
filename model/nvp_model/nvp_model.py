@@ -9,8 +9,9 @@ from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
 
 
 class AttentionNvpModel(chainer.Chain):
-    def __init__(self, hyperparams):
+    def __init__(self, hyperparams, device=-1):
         super(AttentionNvpModel, self).__init__()
+        self.to_device(device)
         self.hyperparams = hyperparams
         self.masks = dict()
         self.masks["relation"] = self._create_masks("relation")
@@ -18,8 +19,8 @@ class AttentionNvpModel(chainer.Chain):
         self.adj_size = self.hyperparams.num_nodes * \
             self.hyperparams.num_nodes * self.hyperparams.num_edge_types
         self.x_size = self.hyperparams.num_nodes * self.hyperparams.num_features
-        assert hasattr(self.hyperparams, "embed_model_path") and hasattr(self.hyperparams, "embed_model_hyper")
 
+        assert hasattr(self.hyperparams, "embed_model_path") and hasattr(self.hyperparams, "embed_model_hyper")
         with self.init_scope():
             self.embed_model = atom_embed_model(Hyperparameter(hyperparams.embed_model_hyper))
             assert self.embed_model.word_size == self.hyperparams.num_features
@@ -71,7 +72,7 @@ class AttentionNvpModel(chainer.Chain):
             adj += self.xp.random.uniform(0, 0.9, adj.shape)
 
         # forward step for adjacency-coupling layers
-        for i in range(self.hyperparams.num_coupling["relation"], len(self.clinks)):
+        for i in range(self.hyperparams.num_coupling["feature"], len(self.clinks)):
             adj, log_det_jacobians = self.clinks[i](adj)
             sum_log_det_jacobian_adj += log_det_jacobians
 
@@ -146,3 +147,15 @@ class AttentionNvpModel(chainer.Chain):
 
     def load_hyperparams(self, path):
         self.hyperparams.load(path)
+    
+    def to_gpu(self, device=None):
+        # self.masks["relation"] = chainer.backends.cuda.to_gpu(self.masks["relation"], device=device)
+        # self.masks["feature"] = chainer.backends.cuda.to_gpu(self.masks["feature"], device=device)
+        # for clink in self.clinks:
+        #     clink.to_gpu(device=device)
+        return super().to_gpu(device=device)
+
+    def to_cpu(self):
+        # self.masks["relation"] = chainer.backends.cuda.to_cpu(self.masks["relation"])
+        # self.masks["feature"] = chainer.backends.cuda.to_cpu(self.masks["feature"])
+        return super().to_cpu()

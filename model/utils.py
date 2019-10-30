@@ -1,4 +1,4 @@
-import logging as lg
+import logging as log
 from chainer import optimizers
 import chainer
 import chainer.backends.cuda as cuda
@@ -8,7 +8,7 @@ def get_and_log(config, key, default_value=None, required=False):
     value = config.get(key, default_value)
     if required and value is None:
         raise ValueError("{} value must be given.".format(key))
-    lg.info("{}:\t{}".format(key, value))
+    log.info("{}:\t{}".format(key, value))
     return value
 
 def get_optimizer(opt_type: str):
@@ -21,21 +21,25 @@ def get_optimizer(opt_type: str):
     elif opt_type == "rmsprop":
         return optimizers.RMSprop
     else:
-        lg.error("Unsupported optmizer {}!".format(opt_type))
+        log.error("Unsupported optmizer {}!".format(opt_type))
         return None
-    
-# class RealNodeMask(chainer.FunctionNode):
-#     def __init__(self, virtual_atom_id, output_shape=None, axis=None):
-#         super(RealNodeMask, self).__init__()
-#         self.virtual_atom_id = virtual_atom_id
-#         self.output_shape = output_shape
-#         self.axis = axis
-
-#     def forward(self, inputs):
-#         # inputs: (batch_size, molecule_size)
-#         xp = cuda.get_array_module(inputs)
-#         # cond: (batch_size, molecule_size) or (batch_size, molecule_size, feature)
-#         cond = xp.not_equal(inputs, self.virtual_atom_id)
 
 def real_node_mask(atom_ids, virtual_atom_id):
     return atom_ids != virtual_atom_id
+
+def set_log_level(str_level: str) -> None:
+    if str_level == "debug":
+        log.basicConfig(level=log.DEBUG)
+    elif str_level == "info":
+        log.basicConfig(level=log.INFO)
+    elif str_level == "warn":
+        log.basicConfig(level=log.WARNING)
+    elif str_level == "error":
+        log.basicConfig(level=log.ERROR)
+    elif str_level == "critical":
+        log.basicConfig(level=log.CRITICAL)
+    else:
+        return
+    
+def get_log_level(str_level: str) -> int:
+    return getattr(log, str_level.upper())

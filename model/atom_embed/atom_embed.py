@@ -139,7 +139,7 @@ class AtomEmbedModel(chainer.Chain):
         return self.embed(x)
     
     def atomid(self, words, adj):
-        return F.argmax(self.rgcn(words, adj), axis=1)
+        return F.argmax(self.rgcn(words, adj), axis=-1)
 
     def save_hyperparameters(self, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)

@@ -136,7 +136,7 @@ class AdditiveAdjCoupling(Coupling):
         y = self.mlp(x)
         y = F.tanh(y)
         y = self.linear(y) * F.exp(self.scale_factor * 2)
-        t = F.reshape(t, [y.shape[0], 1, self.n_nodes, self.n_nodes])
+        t = F.reshape(y, [y.shape[0], 1, self.n_nodes, self.n_nodes])
         return t
 
 
@@ -213,9 +213,9 @@ class AdditiveNodeFeatureCoupling(Coupling):
             self.rgat = RelationalGAT(
                 out_dim=ch_list[0], n_edge_types=n_relations,
                 n_heads=n_attention, hidden_dim=n_features, n_layers=gat_layers)
-            self.linear1 = L.linear(ch_list[0], out_size=ch_list[1])
+            self.linear1 = L.Linear(ch_list[0], out_size=ch_list[1])
             self.linear2 = L.Linear(
-                ch_list[1], out_size=2*self.out_size, initialW=1e-10)
+                ch_list[1], out_size=self.out_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0, shape=[1])
             self.batch_norm = L.BatchNormalization(ch_list[0])
 
