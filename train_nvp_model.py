@@ -63,12 +63,13 @@ def train(hyperparams: Hyperparameter):
         valset, train_params.batch_size, repeat=False, shuffle=False)
 
     # -- model -- #
+    model = AttentionNvpModel(model_params)
     if device >= 0:
-        log.info("Using GPU")
-        model = AttentionNvpModel(model_params, device=device)
+        log.info("Using GPU {}".format(device))
+        chainer.cuda.get_device(device).use()
+        model.to_gpu(device)
     else:
         log.info("Using CPU")
-        model = AttentionNvpModel(model_params)
 
     # -- training details -- #
     num_epoch = train_params.num_epoch

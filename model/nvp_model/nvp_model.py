@@ -9,9 +9,8 @@ from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
 
 
 class AttentionNvpModel(chainer.Chain):
-    def __init__(self, hyperparams, device=-1):
+    def __init__(self, hyperparams):
         super(AttentionNvpModel, self).__init__()
-        self.to_device(device)
         self.hyperparams = hyperparams
         self.masks = dict()
         self.masks["relation"] = self._create_masks("relation")
@@ -149,13 +148,15 @@ class AttentionNvpModel(chainer.Chain):
         self.hyperparams.load(path)
     
     def to_gpu(self, device=None):
-        # self.masks["relation"] = chainer.backends.cuda.to_gpu(self.masks["relation"], device=device)
-        # self.masks["feature"] = chainer.backends.cuda.to_gpu(self.masks["feature"], device=device)
-        # for clink in self.clinks:
-        #     clink.to_gpu(device=device)
-        return super().to_gpu(device=device)
+        super().to_gpu(device=device)
+        self.masks["relation"] = chainer.backends.cuda.to_gpu(self.masks["relation"], device=device)
+        self.masks["feature"] = chainer.backends.cuda.to_gpu(self.masks["feature"], device=device)
+        for clink in self.clinks:
+            clink.to_gpu(device=device)
 
     def to_cpu(self):
-        # self.masks["relation"] = chainer.backends.cuda.to_cpu(self.masks["relation"])
-        # self.masks["feature"] = chainer.backends.cuda.to_cpu(self.masks["feature"])
-        return super().to_cpu()
+        super().to_cpu()
+        self.masks["relation"] = chainer.backends.cuda.to_cpu(self.masks["relation"])
+        self.masks["feature"] = chainer.backends.cuda.to_cpu(self.masks["feature"])
+        for clink in self.clinks:
+            clink.to_cpu()

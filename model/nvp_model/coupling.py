@@ -27,6 +27,14 @@ class Coupling(chainer.Chain):
     def to_gpu(self, device=None):
         super(Coupling, self).to_gpu(device)
         self.mask = cuda.to_gpu(self.mask, device)
+        if hasattr(self, "cal_mask"):
+            self.cal_mask = cuda.to_gpu(self.cal_mask, device)
+    
+    def to_cpu(self):
+        super(Coupling, self).to_cpu()
+        self.mask = cuda.to_cpu(self.mask)
+        if hasattr(self, "cal_mask"):
+            self.cal_mask = cuda.to_cpu(self.cal_mask)
 
 
 class AffineAdjCoupling(Coupling):
