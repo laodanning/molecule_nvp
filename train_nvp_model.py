@@ -107,13 +107,13 @@ def train(hyperparams: Hyperparameter):
                 save_mol_png(mol, os.path.join(mol_dir, "{}.png".format(i)))
 
     # -- trainer extension -- #
-    trainer.extend(extensions.snapshot, trigger=(save_epoch, "epoch"))
+    trainer.extend(extensions.snapshot(), trigger=(save_epoch, "epoch"))
     trainer.extend(extensions.LogReport(filename=output_params.logname))
-    # trainer.extend(print_validity, trigger=(1, "epoch"))
+    trainer.extend(print_validity, trigger=(1, "epoch"))
     trainer.extend(extensions.PrintReport([
         "epoch", "neg_log_likelihood", "nll_x", "nll_adj", "elapsed_time"]))
     trainer.extend(extensions.LogReport())
-    # trainer.extend(extensions.ProgressBar())
+    trainer.extend(extensions.ProgressBar())
     
     # -- start train -- #
     if hasattr(train_params, "load_snapshot"):

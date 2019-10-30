@@ -28,24 +28,28 @@
         "apply_batchnorm": true,
         "num_coupling":
         {
-            "feature": 8,
-            "relation": 4
+            "feature": 36,
+            "relation": 28
         },
         "num_attention_types": 4,
         "num_gat_layers": 4,
-        "gnn_channels": [8, 8],
+        "gnn_channels": [128, 64],
         "learn_dist": true,
-        "mlp_channels": [8, 8],
+        "mlp_channels": [256, 256],
         "additive_feature_coupling": true,
         "additive_relation_coupling": true
     },
     "train":
     {
         "device": 0,
-        "batch_size": 32,
-        "num_epoch": 2,
-        "save_epoch": 1,
+        "batch_size": 256,
+        "num_epoch": 200,
+        "save_epoch": 10,
         "optimizer": "adam",
+        "optimizer_params": 
+        {
+            "alpha": 1e-3
+        },
         "two_step": true,
         "adj_nll_weight": 1.0
     }
