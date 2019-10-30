@@ -162,7 +162,7 @@ class AffineNodeFeatureCoupling(Coupling):
             self.rgat = RelationalGAT(
                 out_dim=ch_list[0], n_edge_types=n_relations,
                 n_heads=n_attention, hidden_dim=n_features, n_layers=gat_layers)
-            self.linear1 = L.linear(ch_list[0], out_size=ch_list[1])
+            self.linear1 = L.Linear(ch_list[0], out_size=ch_list[1])
             self.linear2 = L.Linear(
                 ch_list[1], out_size=2*self.out_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0, shape=[1])

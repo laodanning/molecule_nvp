@@ -40,7 +40,7 @@ class RelationalGAT(chainer.Chain):
                  negative_slope=0.2, n_edge_types=4, n_layers=4, 
                  dropout_ratio=-1, activation=F.tanh,
                  softmax_mode="across", concat_hidden=False,
-                 concat_heads=False, weight_tying=False):
+                 concat_heads=True, weight_tying=False):
         super(RelationalGAT, self).__init__()
         n_readout_layer = n_layers if concat_hidden else 1
         n_message_layer = n_layers
@@ -60,7 +60,7 @@ class RelationalGAT(chainer.Chain):
                     concat_heads=concat_heads))
             self.update_layers = chainer.ChainList(*update_layers)
             self.readout_layers = chainer.ChainList(*[GGNNReadout(
-                out_dim=out_dim, in_channels=hidden_dim,
+                out_dim=out_dim, in_channels=input_dim,
                 activation=activation, activation_agg=activation) 
                 for _ in range(n_readout_layer)])
         self.out_dim = out_dim

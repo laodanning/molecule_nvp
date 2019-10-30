@@ -29,11 +29,11 @@
         "apply_batchnorm": true,
         "num_coupling":
         {
-            "feature": 36,
+            "feature": 32,
             "relation": 28
         },
         "num_attention_types": 4,
-        "num_gat_layers": 4,
+        "num_gat_layers": 2,
         "gnn_channels": [128, 64],
         "learn_dist": true,
         "mlp_channels": [256, 256],
