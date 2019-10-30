@@ -37,8 +37,8 @@
         "gnn_channels": [128, 64],
         "learn_dist": true,
         "mlp_channels": [256, 256],
-        "additive_feature_coupling": true,
-        "additive_relation_coupling": true
+        "additive_feature_coupling": false,
+        "additive_relation_coupling": false
     },
     "train":
     {
