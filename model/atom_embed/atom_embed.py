@@ -49,6 +49,17 @@ class AtomEmbed(chainer.Chain):
             words = self.embed(self.id_trans_fn(x))
         return words
 
+    def atom_id(self, x):
+        # x size: (batch_size, num_atom, word_size)
+        # W siez: (num_atom_types, word_size)
+        xp = chainer.backends.cuda.get_array_module(x)
+        word_matrix = self.embed.W
+        inner_prod_matrix = F.matmul(x, word_matrix.T)
+        word_norms = xp.linalg.norm(word_matrix.array, axis=-1)
+        x_norms = xp.linalg.norm(x.array, axis=-1)
+        norms = xp.matmul(x_norms.reshape(x.shape[0], x.shape[1], 1), word_norms.reshape(1, self.num_atom_type))
+        return F.argmax(inner_prod_matrix / norms, axis=-1)
+
 
 class AtomEmbedRGCNUpdate(chainer.Chain):
 
@@ -139,7 +150,8 @@ class AtomEmbedModel(chainer.Chain):
         return self.embed(x)
     
     def atomid(self, words, adj):
-        return F.argmax(self.rgcn(words, adj), axis=-1)
+        # return F.argmax(self.rgcn(words, adj), axis=-1)
+        return self.embed.atom_id(words)
 
     def save_hyperparameters(self, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
