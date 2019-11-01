@@ -90,7 +90,8 @@ def train(hyperparams: Hyperparameter):
         optimizer,
         device=device,
         two_step=train_params.two_step,
-        adj_nll_weight=train_params.adj_nll_weight)
+        h_nll_weight=train_params.h_nll_weight,
+        reg_fac=train_params.regularization_factor)
     trainer = training.Trainer(
         updater, (num_epoch, "epoch"), out=output_params.root_dir)
     if train_params.has("save_epoch"):

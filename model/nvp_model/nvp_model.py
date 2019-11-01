@@ -19,9 +19,11 @@ class AttentionNvpModel(chainer.Chain):
             self.hyperparams.num_nodes * self.hyperparams.num_edge_types
         self.x_size = self.hyperparams.num_nodes * self.hyperparams.num_features
 
-        assert hasattr(self.hyperparams, "embed_model_path") and hasattr(self.hyperparams, "embed_model_hyper")
+        assert hasattr(self.hyperparams, "embed_model_path") and hasattr(
+            self.hyperparams, "embed_model_hyper")
         with self.init_scope():
-            self.embed_model = atom_embed_model(Hyperparameter(hyperparams.embed_model_hyper))
+            self.embed_model = atom_embed_model(
+                Hyperparameter(hyperparams.embed_model_hyper))
             assert self.embed_model.word_size == self.hyperparams.num_features
             if self.hyperparams.learn_dist:
                 self.ln_var = chainer.Parameter(initializer=0., shape=[1])
@@ -32,19 +34,22 @@ class AttentionNvpModel(chainer.Chain):
             relation_coupling = AdditiveAdjCoupling if self.hyperparams.additive_relation_coupling else AffineAdjCoupling
             clinks = [
                 feature_coupling(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features,
-                                 self.masks["feature"][i % self.hyperparams.num_features],
+                                 self.masks["feature"][i %
+                                                       self.hyperparams.num_features],
                                  batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.gnn_channels,
                                  n_attention=self.hyperparams.num_attention_types, gat_layers=self.hyperparams.num_gat_layers)
                 for i in range(self.hyperparams.num_coupling["feature"])]
             clinks.extend([
                 relation_coupling(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features,
-                                  self.masks["relation"][i % self.hyperparams.num_edge_types],
+                                  self.masks["relation"][i %
+                                                         self.hyperparams.num_edge_types],
                                   batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.mlp_channels)
                 for i in range(self.hyperparams.num_coupling["relation"])])
             self.clinks = chainer.ChainList(*clinks)
 
         # load and fix embed model
-        chainer.serializers.load_npz(self.hyperparams.embed_model_path, self.embed_model)
+        chainer.serializers.load_npz(
+            self.hyperparams.embed_model_path, self.embed_model)
         self.embed_model.disable_update()
         self.word_channel_stds = self.embed_model.word_channel_stds()
 
@@ -108,7 +113,8 @@ class AttentionNvpModel(chainer.Chain):
                 adj = adj / 2
                 # 2. apply normalization along edge type axis and choose the most likely edge type.
                 adj = F.softmax(adj, axis=1)
-                max_bond = F.broadcast_to(F.max(adj, axis=1, keepdims=True), shape=adj.shape)
+                max_bond = F.broadcast_to(
+                    F.max(adj, axis=1, keepdims=True), shape=adj.shape)
                 adj = adj // max_bond
             else:
                 adj = true_adj
@@ -119,17 +125,22 @@ class AttentionNvpModel(chainer.Chain):
             # feature coupling layers
             for i in reversed(range(self.hyperparams.num_coupling["feature"])):
                 h_x, _ = self.clinks[i].reverse(h_x, adj)
-            
+
             atom_ids = self.embed_model.atomid(h_x, adj)
 
         return atom_ids, adj
 
-    def log_prob(self, z, log_det_jacobians):
+    def log_prob(self, z, log_det_jacobians, reg_fac=0.0):
         ln_var_adj = self.ln_var * self.xp.ones([self.adj_size])
         ln_var_x = self.ln_var * self.xp.ones([self.x_size])
-        
-        negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(self.adj_size, dtype=self.xp.float32), ln_var_adj, reduce="no"), axis=1) - log_det_jacobians[1])
-        negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros(self.x_size, dtype=self.xp.float32), ln_var_x, reduce="no"), axis=1) - log_det_jacobians[0])
+
+        negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(
+            self.adj_size, dtype=self.xp.float32), ln_var_adj, reduce="no"), axis=1) - log_det_jacobians[1])
+        negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros(
+            self.x_size, dtype=self.xp.float32), ln_var_x, reduce="no"), axis=1) - log_det_jacobians[0] + reg_fac * F.absolute(log_det_jacobians[0]))
+
+        negative_log_likelihood_adj /= self.adj_size
+        negative_log_likelihood_x /= self.x_size
 
         return [negative_log_likelihood_x, negative_log_likelihood_adj]
 
@@ -147,19 +158,25 @@ class AttentionNvpModel(chainer.Chain):
 
     def load_hyperparams(self, path):
         self.hyperparams.load(path)
-    
+
     def to_gpu(self, device=None):
         super().to_gpu(device=device)
-        self.masks["relation"] = chainer.backends.cuda.to_gpu(self.masks["relation"], device=device)
-        self.masks["feature"] = chainer.backends.cuda.to_gpu(self.masks["feature"], device=device)
-        self.word_channel_stds = chainer.backends.cuda.to_gpu(self.word_channel_stds, device=device)
+        self.masks["relation"] = chainer.backends.cuda.to_gpu(
+            self.masks["relation"], device=device)
+        self.masks["feature"] = chainer.backends.cuda.to_gpu(
+            self.masks["feature"], device=device)
+        self.word_channel_stds = chainer.backends.cuda.to_gpu(
+            self.word_channel_stds, device=device)
         for clink in self.clinks:
             clink.to_gpu(device=device)
 
     def to_cpu(self):
         super().to_cpu()
-        self.masks["relation"] = chainer.backends.cuda.to_cpu(self.masks["relation"])
-        self.masks["feature"] = chainer.backends.cuda.to_cpu(self.masks["feature"])
-        self.word_channel_stds = chainer.backends.cuda.to_cpu(self.word_channel_stds)
+        self.masks["relation"] = chainer.backends.cuda.to_cpu(
+            self.masks["relation"])
+        self.masks["feature"] = chainer.backends.cuda.to_cpu(
+            self.masks["feature"])
+        self.word_channel_stds = chainer.backends.cuda.to_cpu(
+            self.word_channel_stds)
         for clink in self.clinks:
             clink.to_cpu()

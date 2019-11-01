@@ -41,7 +41,7 @@ class NVPUpdater(training.StandardUpdater):
                  converter=molecule_id_converter, 
                  device=None, loss_func=None, 
                  loss_scale=None, auto_new_epoch=True,
-                 two_step=True, adj_nll_weight=1):
+                 two_step=True, h_nll_weight=1, reg_fac=0.0):
         super().__init__(
             iterator, optimizer, converter=converter, 
             device=device, loss_func=loss_func, 
@@ -49,17 +49,18 @@ class NVPUpdater(training.StandardUpdater):
         
         self.model = optimizer.target
         self.two_step = two_step
-        self.adj_nll_weight = adj_nll_weight
+        self.h_nll_weight = h_nll_weight
+        self.reg_fac = reg_fac
 
     def update_core(self):
         batch = self._iterators["main"].next()
         x, adj = self.converter(batch, self.device)
         z, sum_log_det_jacs = self.model(x, adj)
         optimizer = self._optimizers["main"]
-        nll = self.model.log_prob(z, sum_log_det_jacs) # negative log likelihood
+        nll = self.model.log_prob(z, sum_log_det_jacs, self.reg_fac) # negative log likelihood (nll_h, nll_adj)
 
         if self.two_step:
-            loss = nll[0] + self.adj_nll_weight * nll[1]
+            loss = self.h_nll_weight * nll[0] + nll[1]
             chainer.report({"neg_log_likelihood": loss, "nll_x": nll[0], "nll_adj": nll[1]})
         else:
             loss = nll
