@@ -46,14 +46,15 @@ class AttentionNvpModel(chainer.Chain):
         # load and fix embed model
         chainer.serializers.load_npz(self.hyperparams.embed_model_path, self.embed_model)
         self.embed_model.disable_update()
+        self.word_channel_stds = self.embed_model.word_channel_stds()
 
     def __call__(self, x, adj):
         # x (batch_size, ): atom id array
         h = chainer.as_variable(x)
         h = self.embed_model.embedding(h)
-        # add uniform noise to node feature matrices
-        # if chainer.config.train:
-        #     h += self.xp.random.uniform(0, 0.9, h.shape)
+        # TODO: add gaussian noise here
+        if chainer.config.train:
+            h += (self.xp.random.randn(*h.shape) * self.word_channel_stds)
 
         adj = chainer.as_variable(adj)
         sum_log_det_jacobian_x = chainer.as_variable(
@@ -151,6 +152,7 @@ class AttentionNvpModel(chainer.Chain):
         super().to_gpu(device=device)
         self.masks["relation"] = chainer.backends.cuda.to_gpu(self.masks["relation"], device=device)
         self.masks["feature"] = chainer.backends.cuda.to_gpu(self.masks["feature"], device=device)
+        self.word_channel_stds = chainer.backends.cuda.to_gpu(self.word_channel_stds, device=device)
         for clink in self.clinks:
             clink.to_gpu(device=device)
 
@@ -158,5 +160,6 @@ class AttentionNvpModel(chainer.Chain):
         super().to_cpu()
         self.masks["relation"] = chainer.backends.cuda.to_cpu(self.masks["relation"])
         self.masks["feature"] = chainer.backends.cuda.to_cpu(self.masks["feature"])
+        self.word_channel_stds = chainer.backends.cuda.to_cpu(self.word_channel_stds)
         for clink in self.clinks:
             clink.to_cpu()

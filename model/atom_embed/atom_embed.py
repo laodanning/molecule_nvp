@@ -60,6 +60,13 @@ class AtomEmbed(chainer.Chain):
         norms = xp.matmul(x_norms.reshape(x.shape[0], x.shape[1], 1), word_norms.reshape(1, self.num_atom_type))
         return F.argmax(inner_prod_matrix / norms, axis=-1)
 
+    def get_word_channel_stds(self):
+        words = self.embed.W.array # (num_atom_types, word_size)
+        # mean_square_w = self.xp.mean(words ** 2, axis=0)
+        # square_mean_w = self.xp.mean(words, axis=0) ** 2
+        # return mean_square_w - square_mean_w
+        return self.xp.std(words, axis=0)
+
 
 class AtomEmbedRGCNUpdate(chainer.Chain):
 
@@ -152,6 +159,9 @@ class AtomEmbedModel(chainer.Chain):
     def atomid(self, words, adj):
         # return F.argmax(self.rgcn(words, adj), axis=-1)
         return self.embed.atom_id(words)
+    
+    def word_channel_stds(self):
+        return self.embed.get_word_channel_stds()
 
     def save_hyperparameters(self, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
