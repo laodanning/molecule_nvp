@@ -52,8 +52,8 @@ class AttentionNvpModel(chainer.Chain):
         h = chainer.as_variable(x)
         h = self.embed_model.embedding(h)
         # add uniform noise to node feature matrices
-        if chainer.config.train:
-            h += self.xp.random.uniform(0, 0.9, h.shape)
+        # if chainer.config.train:
+        #     h += self.xp.random.uniform(0, 0.9, h.shape)
 
         adj = chainer.as_variable(adj)
         sum_log_det_jacobian_x = chainer.as_variable(
@@ -128,7 +128,7 @@ class AttentionNvpModel(chainer.Chain):
         ln_var_x = self.ln_var * self.xp.ones([self.x_size])
         
         negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(self.adj_size, dtype=self.xp.float32), ln_var_adj, reduce="no"), axis=1) - log_det_jacobians[1])
-        negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros([self.x_size], dtype=self.xp.float32), ln_var_x, reduce="no"), axis=1) - log_det_jacobians[0])
+        negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros(self.x_size, dtype=self.xp.float32), ln_var_x, reduce="no"), axis=1) - log_det_jacobians[0])
 
         return [negative_log_likelihood_x, negative_log_likelihood_adj]
 
