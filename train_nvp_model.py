@@ -81,7 +81,6 @@ def train(hyperparams: Hyperparameter):
     model = AttentionNvpModel(model_params)
     if isinstance(device, dict):
         log.info("Using multi-GPU {}".format(device))
-        chainer.cuda.get_device(main_device).use()
         model.to_gpu(main_device)
     elif device >= 0:
         log.info("Using GPU {}".format(device))
@@ -124,17 +123,18 @@ def train(hyperparams: Hyperparameter):
 
     # -- evaluation function -- #
     def print_validity(trainer):
-        save_mol = (get_log_level(output_params.log_level) <= log.DEBUG)
-        x, adj = generate_mols(model, batch_size=100,
-                               device=main_device)  # x: atom id
-        valid_mols = check_validity(
-            x, adj, atomic_num_list=atomic_num_list, device=main_device)
-        if save_mol:
-            mol_dir = os.path.join(output_params.root_dir, output_params.saved_mol_dir,
-                                   "generated_{}".format(trainer.updater.epoch))
-            os.makedirs(mol_dir, exist_ok=True)
-            for i, mol in enumerate(valid_mols["valid_mols"]):
-                save_mol_png(mol, os.path.join(mol_dir, "{}.png".format(i)))
+        with chainer.using_device(chainer.backends.cuda.get_device_from_id(main_device)):
+            save_mol = (get_log_level(output_params.log_level) <= log.DEBUG)
+            x, adj = generate_mols(model, batch_size=100,
+                                device=main_device)  # x: atom id
+            valid_mols = check_validity(
+                x, adj, atomic_num_list=atomic_num_list, device=main_device)
+            if save_mol:
+                mol_dir = os.path.join(output_params.root_dir, output_params.saved_mol_dir,
+                                    "generated_{}".format(trainer.updater.epoch))
+                os.makedirs(mol_dir, exist_ok=True)
+                for i, mol in enumerate(valid_mols["valid_mols"]):
+                    save_mol_png(mol, os.path.join(mol_dir, "{}.png".format(i)))
 
     # -- trainer extension -- #
     trainer.extend(extensions.snapshot(), trigger=(save_epoch, "epoch"))
