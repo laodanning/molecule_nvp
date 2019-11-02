@@ -81,10 +81,11 @@ def train(hyperparams: Hyperparameter):
     model = AttentionNvpModel(model_params)
     if isinstance(device, dict):
         log.info("Using multi-GPU {}".format(device))
+        chainer.cuda.get_device(main_device).use()
         model.to_gpu(main_device)
     elif device >= 0:
         log.info("Using GPU {}".format(device))
-        chainer.cuda.get_device(device).use()
+        chainer.cuda.get_device(main_device).use()
         model.to_gpu(device)
     else:
         log.info("Using CPU")
