@@ -103,7 +103,6 @@ def train(hyperparams: Hyperparameter):
             train_iter,
             optimizer,
             devices=device,
-            models=model,
             two_step=train_params.two_step,
             h_nll_weight=train_params.h_nll_weight,
             reg_fac=train_params.regularization_factor)
