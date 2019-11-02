@@ -45,6 +45,7 @@ def train(hyperparams: Hyperparameter):
         data_parallel = True
     else:
         raise ValueError("Invalid device.")
+    log.info("Main Device: {}".format(main_device))
 
     log.info("dataset hyperparameters:\n{}\n".format(dataset_params))
     log.info("configuration hyperparameters:\n{}\n".format(config_params))
