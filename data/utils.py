@@ -66,7 +66,8 @@ def generate_mols(model: chainer.Chain, temp=0.7, z_mu=None, batch_size=20, true
     :param gpu:
     :return:
     """
-    xp = chainer.backends.cuda.cupy if device >= 0 else np
+    device_obj = chainer.backends.cuda.get_device_from_id(device)
+    xp = device_obj.xp
     z_dim = model.adj_size + model.x_size
     mu = xp.zeros([z_dim], dtype=xp.float32)
     sigma_diag = xp.ones([z_dim])
