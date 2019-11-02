@@ -123,8 +123,6 @@ class DataParallelNVPUpdater(training.ParallelUpdater):
                     else:
                         loss = nll
             losses.append(loss)
-        average_losses = sum(losses) / len(losses)
-        chainer.report({"neg_log_likelihood": average_losses})
         
         for model in six.itervalues(self._models):
             model.cleargrads()
@@ -134,6 +132,13 @@ class DataParallelNVPUpdater(training.ParallelUpdater):
         
         for model in six.itervalues(models_others):
             model_main.addgrads(model)
+        
+        total_loss = 0.0
+        for loss in losses:
+            loss_in_cpu = F.copy(loss, -1)
+            total_loss += loss_in_cpu
+        average_losses = total_loss / len(losses)
+        chainer.report({"neg_log_likelihood": average_losses})
         
         optimizer.update()
 
