@@ -59,7 +59,7 @@ class AttentionNvpModel(chainer.Chain):
         h = self.embed_model.embedding(h)
         # TODO: add gaussian noise here
         if chainer.config.train:
-            h += (self.xp.random.randn(*h.shape) * self.word_channel_stds)
+            h += (self.xp.random.randn(*h.shape) * self.word_channel_stds * self.hyperparams.feature_noise_scale)
 
         adj = chainer.as_variable(adj)
         sum_log_det_jacobian_x = chainer.as_variable(
