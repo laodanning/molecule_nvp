@@ -12,7 +12,7 @@ from data.utils import get_validation_idxs, generate_mols,\
      check_validity, get_atomic_num_id, save_mol_png
 from model.atom_embed.atom_embed import AtomEmbedModel
 from model.nvp_model.nvp_model import AttentionNvpModel
-from model.updaters import NVPUpdater
+from model.updaters import NVPUpdater, DataParallelNVPUpdater
 from model.evaluators import AtomEmbedEvaluator
 from model.utils import get_and_log, get_optimizer, set_log_level, get_log_level
 from model.hyperparameter import Hyperparameter
@@ -34,7 +34,17 @@ def train(hyperparams: Hyperparameter):
         log.basicConfig(level=get_log_level(output_params.log_level))
     hyperparams.save(os.path.join(output_params.root_dir, "hyperparams.json"))
     atomic_num_list = get_atomic_num_id(os.path.join(config_params.root_dir, config_params.atom_id_to_atomic_num))
-    device = train_params.device
+    
+    data_parallel = False
+    if isinstance(train_params.device, int):
+        main_device = train_params.device
+        device = main_device
+    elif isinstance(train_params.device, dict):
+        main_device = train_params.device["main"]
+        device = train_params.device
+        data_parallel = True
+    else:
+        raise ValueError("Invalid device.")
 
     log.info("dataset hyperparameters:\n{}\n".format(dataset_params))
     log.info("configuration hyperparameters:\n{}\n".format(config_params))
@@ -69,7 +79,10 @@ def train(hyperparams: Hyperparameter):
 
     # -- model -- #
     model = AttentionNvpModel(model_params)
-    if device >= 0:
+    if isinstance(device, dict):
+        log.info("Using multi-GPU {}".format(device))
+        model.to_gpu(main_device)
+    elif device >= 0:
         log.info("Using GPU {}".format(device))
         chainer.cuda.get_device(device).use()
         model.to_gpu(device)
@@ -85,13 +98,23 @@ def train(hyperparams: Hyperparameter):
         optimizer = opt_gen()
 
     optimizer.setup(model)
-    updater = NVPUpdater(
-        train_iter,
-        optimizer,
-        device=device,
-        two_step=train_params.two_step,
-        h_nll_weight=train_params.h_nll_weight,
-        reg_fac=train_params.regularization_factor)
+    if data_parallel:
+        updater = DataParallelNVPUpdater(
+            train_iter,
+            optimizer,
+            devices=device,
+            models=model,
+            two_step=train_params.two_step,
+            h_nll_weight=train_params.h_nll_weight,
+            reg_fac=train_params.regularization_factor)
+    else:
+        updater = NVPUpdater(
+            train_iter,
+            optimizer,
+            device=device,
+            two_step=train_params.two_step,
+            h_nll_weight=train_params.h_nll_weight,
+            reg_fac=train_params.regularization_factor)
     trainer = training.Trainer(
         updater, (num_epoch, "epoch"), out=output_params.root_dir)
     if train_params.has("save_epoch"):
@@ -103,9 +126,9 @@ def train(hyperparams: Hyperparameter):
     def print_validity(trainer):
         save_mol = (get_log_level(output_params.log_level) <= log.DEBUG)
         x, adj = generate_mols(model, batch_size=100,
-                               device=device)  # x: atom id
+                               device=main_device)  # x: atom id
         valid_mols = check_validity(
-            x, adj, atomic_num_list=atomic_num_list, device=device)
+            x, adj, atomic_num_list=atomic_num_list, device=main_device)
         if save_mol:
             mol_dir = os.path.join(output_params.root_dir, output_params.saved_mol_dir,
                                    "generated_{}".format(trainer.updater.epoch))
