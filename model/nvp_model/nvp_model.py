@@ -7,6 +7,7 @@ from model.hyperparameter import Hyperparameter
 from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
     AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
 
+import math
 
 class AttentionNvpModel(chainer.Chain):
     def __init__(self, hyperparams):
@@ -25,10 +26,11 @@ class AttentionNvpModel(chainer.Chain):
             self.embed_model = atom_embed_model(
                 Hyperparameter(hyperparams.embed_model_hyper))
             assert self.embed_model.word_size == self.hyperparams.num_features
+            initial_ln_z_var = math.log(self.hyperparams.initial_z_var)
             if self.hyperparams.learn_dist:
-                self.ln_var = chainer.Parameter(initializer=0., shape=[1])
+                self.ln_var = chainer.Parameter(initializer=initial_ln_z_var, shape=[1])
             else:
-                self.ln_var = chainer.Variable(initializer=0., shape=[1])
+                self.ln_var = chainer.Variable(initializer=initial_ln_z_var, shape=[1])
 
             feature_coupling = AdditiveNodeFeatureCoupling if self.hyperparams.additive_feature_coupling else AffineNodeFeatureCoupling
             relation_coupling = AdditiveAdjCoupling if self.hyperparams.additive_relation_coupling else AffineAdjCoupling
@@ -57,7 +59,8 @@ class AttentionNvpModel(chainer.Chain):
         # x (batch_size, ): atom id array
         h = chainer.as_variable(x)
         h = self.embed_model.embedding(h)
-        # TODO: add gaussian noise here
+
+        # add gaussian noise
         if chainer.config.train:
             h += (self.xp.random.randn(*h.shape) * self.word_channel_stds * self.hyperparams.feature_noise_scale)
 
@@ -130,14 +133,14 @@ class AttentionNvpModel(chainer.Chain):
 
         return atom_ids, adj
 
-    def log_prob(self, z, log_det_jacobians, reg_fac=0.0):
+    def log_prob(self, z, log_det_jacobians):
         ln_var_adj = self.ln_var * self.xp.ones([self.adj_size])
         ln_var_x = self.ln_var * self.xp.ones([self.x_size])
 
         negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(
             self.adj_size, dtype=self.xp.float32), ln_var_adj, reduce="no"), axis=1) - log_det_jacobians[1])
         negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros(
-            self.x_size, dtype=self.xp.float32), ln_var_x, reduce="no"), axis=1) - log_det_jacobians[0] + reg_fac * F.absolute(log_det_jacobians[0]))
+            self.x_size, dtype=self.xp.float32), ln_var_x, reduce="no"), axis=1) - log_det_jacobians[0])
 
         negative_log_likelihood_adj /= self.adj_size
         negative_log_likelihood_x /= self.x_size

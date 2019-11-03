@@ -105,16 +105,14 @@ def train(hyperparams: Hyperparameter):
             optimizer,
             devices=device,
             two_step=train_params.two_step,
-            h_nll_weight=train_params.h_nll_weight,
-            reg_fac=train_params.regularization_factor)
+            h_nll_weight=train_params.h_nll_weight)
     else:
         updater = NVPUpdater(
             train_iter,
             optimizer,
             device=device,
             two_step=train_params.two_step,
-            h_nll_weight=train_params.h_nll_weight,
-            reg_fac=train_params.regularization_factor)
+            h_nll_weight=train_params.h_nll_weight)
     trainer = training.Trainer(
         updater, (num_epoch, "epoch"), out=output_params.root_dir)
     if train_params.has("save_epoch"):

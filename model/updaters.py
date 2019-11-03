@@ -7,6 +7,7 @@ import six
 from chainer import function
 from functools import reduce
 
+
 class AtomEmbedUpdater(training.StandardUpdater):
     def __init__(self, iterator, optimizer,
                  converter=molecule_id_converter,
@@ -43,7 +44,7 @@ class NVPUpdater(training.StandardUpdater):
                  converter=molecule_id_converter,
                  device=None, loss_func=None,
                  loss_scale=None, auto_new_epoch=True,
-                 two_step=True, h_nll_weight=1, reg_fac=0.0):
+                 two_step=True, h_nll_weight=1):
         super().__init__(
             iterator, optimizer, converter=converter,
             device=device, loss_func=loss_func,
@@ -52,7 +53,6 @@ class NVPUpdater(training.StandardUpdater):
         self.model = optimizer.target
         self.two_step = two_step
         self.h_nll_weight = h_nll_weight
-        self.reg_fac = reg_fac
 
     def update_core(self):
         batch = self._iterators["main"].next()
@@ -60,7 +60,7 @@ class NVPUpdater(training.StandardUpdater):
         z, sum_log_det_jacs = self.model(x, adj)
         optimizer = self._optimizers["main"]
         # negative log likelihood (nll_h, nll_adj)
-        nll = self.model.log_prob(z, sum_log_det_jacs, self.reg_fac)
+        nll = self.model.log_prob(z, sum_log_det_jacs)
 
         if self.two_step:
             loss = self.h_nll_weight * nll[0] + nll[1]
@@ -79,22 +79,22 @@ class NVPUpdater(training.StandardUpdater):
 
 
 class DataParallelNVPUpdater(training.ParallelUpdater):
-    def __init__(self, iterator, optimizer, 
-                 converter=molecule_id_converter, 
-                 models=None, devices=None, 
-                 loss_func=None, loss_scale=None, 
-                 auto_new_epoch=True, two_step=True, 
-                 h_nll_weight=1, reg_fac=0.0):
+    def __init__(self, iterator, optimizer,
+                 converter=molecule_id_converter,
+                 models=None, devices=None,
+                 loss_func=None, loss_scale=None,
+                 auto_new_epoch=True, two_step=True,
+                 h_nll_weight=1):
         super().__init__(iterator, optimizer, converter=converter, models=models, devices=devices,
                          loss_func=loss_func, loss_scale=loss_scale, auto_new_epoch=auto_new_epoch)
         self.two_step = two_step
         self.h_nll_weight = h_nll_weight
-        self.reg_fac = reg_fac
-    
+
     def update_core(self):
         optimizer = self.get_optimizer("main")
         model_main = optimizer.target
-        models_others = {k: v for k, v in self._models.items() if v is not model_main}
+        models_others = {k: v for k, v in self._models.items()
+                         if v is not model_main}
 
         iterator = self.get_iterator("main")
         batch = iterator.next()
@@ -103,8 +103,9 @@ class DataParallelNVPUpdater(training.ParallelUpdater):
         n = len(self._models)
         in_arrays_lists = {}
         for i, key in enumerate(six.iterkeys(self._models)):
-            in_arrays_lists[key] = self.converter(batch[i::n], self._devices[key])
-        
+            in_arrays_lists[key] = self.converter(
+                batch[i::n], self._devices[key])
+
         # for reducing memory
         for model in six.itervalues(self._models):
             model.cleargrads()
@@ -116,35 +117,34 @@ class DataParallelNVPUpdater(training.ParallelUpdater):
             with function.force_backprop_mode():
                 with chainer.using_device(self._devices[model_key]):
                     z, sum_log_det_jacs = model(x, adj)
-                    nll = model.log_prob(z, sum_log_det_jacs, self.reg_fac)
+                    nll = model.log_prob(z, sum_log_det_jacs)
 
                     if self.two_step:
                         loss = self.h_nll_weight * nll[0] + nll[1]
                     else:
                         loss = nll
             losses.append(loss)
-        
+
         for model in six.itervalues(self._models):
             model.cleargrads()
-        
+
         for loss in losses:
             loss.backward(loss_scale=self.loss_scale)
-        
+
         for model in six.itervalues(models_others):
             model_main.addgrads(model)
-        
+
         total_loss = 0.0
         for loss in losses:
             loss_in_cpu = F.copy(loss, -1)
             total_loss += loss_in_cpu
         average_losses = total_loss / len(losses)
         chainer.report({"neg_log_likelihood": average_losses})
-        
+
         optimizer.update()
 
         for model in six.itervalues(models_others):
             model.copyparams(model_main)
-        
+
         if self.auto_new_epoch and iterator.is_new_epoch:
             optimizer.new_epoch(auto=True)
-            

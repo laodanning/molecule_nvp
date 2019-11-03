@@ -39,7 +39,8 @@
         "mlp_channels": [256, 256],
         "additive_feature_coupling": false,
         "additive_relation_coupling": false,
-        "feature_noise_scale": 0.01
+        "feature_noise_scale": 0.01,
+        "initial_z_var": 0.1
     },
     "train":
     {
@@ -49,7 +50,6 @@
         "save_epoch": 10,
         "optimizer": "adam",
         "two_step": true,
-        "h_nll_weight": 1,
-        "regularization_factor": 0.5
+        "h_nll_weight": 1
     }
 }
