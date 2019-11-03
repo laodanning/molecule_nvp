@@ -103,4 +103,3 @@ class RelationalGAT(chainer.Chain):
         else:
             g = self.readout_layers[0](h)
             return g
-

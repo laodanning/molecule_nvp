@@ -15,8 +15,10 @@ def get_adj_info(mol):
     bonds = mol.GetBonds()
     # (start_node_idx, end_node_idx, bond_type)
     # bond_type: 1.0 for SINGLE, 1.5 for AROMATIC, 2.0 for DOUBLE, 3.0 for TRIPLE
-    adj_info = map(lambda b:(b.GetBeginAtomIdx(), b.GetEndAtomIdx(), b.GetBondTypeAsDouble()), bonds)
+    adj_info = map(lambda b: (b.GetBeginAtomIdx(),
+                              b.GetEndAtomIdx(), b.GetBondTypeAsDouble()), bonds)
     return adj_info
+
 
 def construct_atom_id_array_func(id_to_atomic_num: list):
     def construct_atom_id_array(mol, out_size=-1):
@@ -26,6 +28,7 @@ def construct_atom_id_array_func(id_to_atomic_num: list):
             atom_id_array[i] = id_to_atomic_num.index(atomic_num_array[i])
         return atom_id_array
     return construct_atom_id_array
+
 
 def construct_discrete_edge_matrix(mol, out_size=-1, kekulize=False):
     """construct adjacency tensor. In addition to NxN adjacency matrix,
@@ -60,17 +63,17 @@ def construct_discrete_edge_matrix(mol, out_size=-1, kekulize=False):
                                         .format(out_size, N))
 
     adjs = np.zeros((num_edge_type, size, size), dtype=np.float32)
-    adjs[0] += 1 # virtual link
-    adjs[0] -= np.eye(size) # remove self-connection from virtual link 
+    adjs[0] += 1  # virtual link
+    adjs[0] -= np.eye(size)  # remove self-connection from virtual link
     for info in get_adj_info(mol):
         s, e, b = info
-        if b == 1.5: # AROMATIC
+        if b == 1.5:  # AROMATIC
             b = num_edge_type-1
         adjs[int(b), s, e] = 1.0
         adjs[int(b), e, s] = 1.0
         adjs[0, s, e] = 0.0
         adjs[0, e, s] = 0.0
-    
+
     return adjs
 
 
@@ -91,7 +94,8 @@ class RelationalGraphPreprocessor(MolPreprocessor):
     """
 
     def __init__(self, max_atoms=-1, out_size=-1, add_Hs=False, id_to_atomic_num=None, kekulize=False):
-        super(RelationalGraphPreprocessor, self).__init__(add_Hs=add_Hs, kekulize=kekulize)
+        super(RelationalGraphPreprocessor, self).__init__(
+            add_Hs=add_Hs, kekulize=kekulize)
         if max_atoms >= 0 and 0 <= out_size < max_atoms:
             raise ValueError('max_atoms {} must be less or equal to '
                              'out_size {}'.format(max_atoms, out_size))
@@ -102,7 +106,8 @@ class RelationalGraphPreprocessor(MolPreprocessor):
         if id_to_atomic_num is None:
             self.atom_feature_func = construct_atomic_number_array
         else:
-            self.atom_feature_func = construct_atom_id_array_func(id_to_atomic_num)
+            self.atom_feature_func = construct_atom_id_array_func(
+                id_to_atomic_num)
 
     def get_input_features(self, mol):
         """get input features
@@ -113,8 +118,10 @@ class RelationalGraphPreprocessor(MolPreprocessor):
         """
         type_check_num_atoms(mol, self.max_atoms)
         atom_array = self.atom_feature_func(mol, out_size=self.out_size)
-        adj_tensor = construct_discrete_edge_matrix(mol, out_size=self.out_size, kekulize=self.kekulize)
+        adj_tensor = construct_discrete_edge_matrix(
+            mol, out_size=self.out_size, kekulize=self.kekulize)
         return (atom_array, adj_tensor)
+
 
 if __name__ == "__main__":
     import rdkit
@@ -126,7 +133,6 @@ if __name__ == "__main__":
     atom_features, adjs = preprocessor.get_input_features(mol)
     print(atom_features)
     print(adjs)
-
 
     import chainer
     import chainer.functions as F
@@ -141,7 +147,8 @@ if __name__ == "__main__":
         batch_size, num_edge_type, num_node, _ = adj.shape
         base = xp.ones(num_neighbors.shape, dtype=xp.float32)
         cond = num_neighbors.array != 0
-        num_neighbors_inv = F.reshape(1 / F.where(cond, num_neighbors, base), (batch_size, 1, 1, num_node))
+        num_neighbors_inv = F.reshape(
+            1 / F.where(cond, num_neighbors, base), (batch_size, 1, 1, num_node))
         return adj * F.broadcast_to(num_neighbors_inv, adj.shape)
 
     print(rescale_adj(np.reshape(adjs, [1] + list(adjs.shape))))

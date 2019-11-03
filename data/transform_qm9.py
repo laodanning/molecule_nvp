@@ -1,6 +1,7 @@
 import numpy as np
 import json
 
+
 def one_hot(data, out_size=9, num_max_id=5):
     assert data.shape[0] == out_size
     b = np.zeros((out_size, num_max_id))
