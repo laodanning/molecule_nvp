@@ -162,6 +162,10 @@ class AttentionNvpModel(chainer.Chain):
     def load_hyperparams(self, path):
         self.hyperparams.load(path)
 
+    @property
+    def z_var(self):
+        return F.exp(self.ln_var).array[0]
+
     def to_gpu(self, device=None):
         super().to_gpu(device=device)
         self.masks["relation"] = chainer.backends.cuda.to_gpu(

@@ -65,10 +65,10 @@ class NVPUpdater(training.StandardUpdater):
         if self.two_step:
             loss = self.h_nll_weight * nll[0] + nll[1]
             chainer.report({"neg_log_likelihood": loss,
-                            "nll_x": nll[0], "nll_adj": nll[1]})
+                            "nll_x": nll[0], "nll_adj": nll[1], "z_var": self.model.z_var})
         else:
             loss = nll
-            chainer.report({"neg_log_likelihood": loss})
+            chainer.report({"neg_log_likelihood": loss, "z_var": self.model.z_var})
 
         self.model.cleargrads()
         loss.backward()
@@ -139,7 +139,7 @@ class DataParallelNVPUpdater(training.ParallelUpdater):
             loss_in_cpu = F.copy(loss, -1)
             total_loss += loss_in_cpu
         average_losses = total_loss / len(losses)
-        chainer.report({"neg_log_likelihood": average_losses})
+        chainer.report({"neg_log_likelihood": average_losses, "z_var": model_main.z_var})
 
         optimizer.update()
 
