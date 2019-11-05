@@ -56,7 +56,7 @@ def get_atomic_num_id(file_path):
     return data
 
 
-def generate_mols(model: chainer.Chain, temp=0.7, z_mu=None, batch_size=20, true_adj=None, device=-1):
+def generate_mols(model: chainer.Chain, temp_base=0.7, z_mu=None, batch_size=20, true_adj=None, device=-1):
     """
 
     :param model: GraphNVP model
@@ -76,7 +76,7 @@ def generate_mols(model: chainer.Chain, temp=0.7, z_mu=None, batch_size=20, true
         sigma_diag = xp.sqrt(xp.exp(model.ln_var.data)) * sigma_diag
         # sigma_diag = xp.exp(xp.hstack((model.ln_var_x.data, model.ln_var_adj.data)))
 
-    sigma = temp * sigma_diag
+    sigma = (temp_base * model.z_var) * sigma_diag
 
     with chainer.no_backprop_mode():
         if z_mu is not None:

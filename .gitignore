@@ -110,6 +110,7 @@ output/
 dev_test.py
 config/*test.json
 stats/
+dev_test/
 
 # vscode
 .vscode/

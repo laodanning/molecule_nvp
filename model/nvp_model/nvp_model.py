@@ -8,6 +8,8 @@ from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
     AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
 
 import math
+import os
+import logging as log
 
 class AttentionNvpModel(chainer.Chain):
     def __init__(self, hyperparams):
@@ -161,6 +163,17 @@ class AttentionNvpModel(chainer.Chain):
 
     def load_hyperparams(self, path):
         self.hyperparams.load(path)
+
+    def load_from(self, path):
+        if os.path.exists(path):
+            log.info("Try load model from {}".format(path))
+            try:
+                chainer.serializers.load_npz(path, self)
+            except:
+                log.warning("Fail in loading model from {}".format(path))
+                return False
+            return True
+        raise ValueError("{} does not exist.".format(path))
 
     @property
     def z_var(self):
