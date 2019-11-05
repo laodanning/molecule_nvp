@@ -70,6 +70,8 @@ class NVPUpdater(training.StandardUpdater):
             loss = nll
             chainer.report({"neg_log_likelihood": loss, "z_var": self.model.z_var})
 
+        loss += F.square(F.exp(self.model.ln_var) + F.exp(-self.model.ln_var))
+
         self.model.cleargrads()
         loss.backward()
         optimizer.update()
@@ -123,6 +125,7 @@ class DataParallelNVPUpdater(training.ParallelUpdater):
                         loss = self.h_nll_weight * nll[0] + nll[1]
                     else:
                         loss = nll
+                    loss += F.square(F.exp(model.ln_var) + F.exp(-model.ln_var))
             losses.append(loss)
 
         for model in six.itervalues(self._models):
