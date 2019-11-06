@@ -1,0 +1,19 @@
+{
+    "model_root_path": "./output/qm9",
+    "data_root_path": "./dataset",
+    "output_root_path": "./output/qm9",
+    "model_file": "attention-nvp_final.npz",
+    "model_hyperparams": "hyperparams.json",
+    "device": 0,
+    "dataset": "qm9_relgraph_kekulized.npz",
+    "train_validation_split": "./conig/validation_idx_qm9.json",
+    "atom_id_to_atomic_num": "./config/atomic_num_qm9.json",
+    "batch_size": 100,
+    "delta": 0.1,
+    "num_experiments": 1,
+    "temperature": 1.0,
+    "seed": null,
+    "debug": false,
+    "save_fig": false,
+    "draw_neighbor": false
+}

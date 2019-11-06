@@ -4,7 +4,6 @@ import chainer.functions as F
 from chainer_chemistry import MAX_ATOMIC_NUM
 from chainer_chemistry.links import EmbedAtomID
 from chainer_chemistry.links import GraphLinear
-from model.utils import get_and_log
 from model.hyperparameter import Hyperparameter
 import json
 import os
