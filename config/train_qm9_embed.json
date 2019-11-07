@@ -4,7 +4,7 @@
     "train_validation_split": "validation_idx_qm9.json",
     "atom_id_to_atomic_num": "atomic_num_qm9.json",
     "dataset": "qm9_relgraph_kekulized.npz",
-    "out_dir": "./output/qm9_test",
+    "out_dir": "./output/qm9",
     "device": 0,
 
     "embed_word_size": 8,
@@ -14,7 +14,7 @@
     "layers": [8],
     "scale_adj": true,
 
-    "num_epoch": 20,
+    "num_epoch": 10,
     "batch_size": 512,
     "optimizer": "adam",
     "log_name": "embed_train_log"

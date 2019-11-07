@@ -9,6 +9,8 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from rdkit.Chem.rdchem import Atom, RWMol
 
+import data.relational_graph_preprocessor as molecule_preprocessor
+
 """ - channel 0 for No link (virtual link)
     - channel 1 for SINGLE
     - channel 2 for DOUBLE
@@ -139,6 +141,14 @@ def adj_to_smiles(data: list, atomic_num_list: list) -> list:
     return valid
 
 
+def smiles_to_adj(smiles, max_atoms, out_size, atom_id_to_atomic_num_list):
+    preprocessor = molecule_preprocessor.RelationalGraphPreprocessor(
+        max_atoms=max_atoms, out_size=out_size, 
+        id_to_atomic_num=atom_id_to_atomic_num_list, kekulize=True)
+    
+    return preprocessor.get_input_features(Chem.MolFromSmiles(smiles))
+
+
 def check_validity(x, adj, atomic_num_list, device=-1, return_unique=True):
     adj = _to_numpy_array(adj, device)
     x = _to_numpy_array(x, device)
@@ -182,9 +192,31 @@ def check_novelty(gen_smiles, train_smiles):
     return novel_ratio
 
 
-def visualize_interpolation(filepath: str, model: chainer.Chain, atomic_num_id: list, mol_smiles=None, mols_per_row=13,
+def get_latent_vec(model, smiles, max_atoms, out_size, atom_id_to_atomic_num):
+    x, adj = smiles_to_adj(smiles, max_atoms, out_size, atom_id_to_atomic_num)
+    x = np.expand_dims(x, axis=0)
+    adj = np.expand_dims(adj, axis=0)
+    with chainer.no_backprop_mode():
+        z = model(x, adj)
+    return np.hstack([z[0][0].data, z[0][1].data]).squeeze(0)
+
+
+def visualize_interpolation(filepath: str, model: chainer.Chain, atomic_num_id: list, max_atom: int, out_size: int, mol_smiles=None, mols_per_row=13,
                             delta=0.1, seed=0, true_data=None, device=-1):
-    pass
+    z0 = None
+    if mol_smiles is not None:
+        z0 = get_latent_vec(model, mol_smiles, max_atom, out_size, atomic_num_id)
+    else:
+        with chainer.no_backprop_mode():
+            np.random.seed(seed)
+            mol_index = np.random.randint(0, len(true_data))
+            adj = np.expand_dims(true_data[mol_index][1], axis=0)
+            x = np.expand_dims(true_data[mol_index], axis=0)
+            z0 = model(x, adj)
+            z0 = np.hstack((z0[0][0].data, z0[0][1].data)).squeeze(0)
+        
+    x, adj = None
+
 
 
 def _to_numpy_array(x, device=-1):
