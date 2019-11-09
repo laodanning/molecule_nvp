@@ -7,8 +7,7 @@ import numpy as np
 from rdkit.Chem import Draw
 from chainer_chemistry.datasets import NumpyTupleDataset
 
-from data.utils import adj_to_smiles, get_atomic_num_id, get_validation_idxs, \
-    generate_mols, check_validity, check_novelty
+from data.utils import *
 from model.hyperparameter import Hyperparameter
 from model.nvp_model.nvp_model import AttentionNvpModel
 from model.utils import load_model_from
@@ -16,7 +15,8 @@ from model.utils import load_model_from
 if __name__ == "__main__":
     log.basicConfig(level=log.INFO)
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", type=str, default="./config/generate_qm9.json", help="path to configuration file")
+    parser.add_argument("-c", "--config", type=str,
+                        default="./config/generate_qm9.json", help="path to configuration file")
     args = parser.parse_args()
 
     # -- hyperparams -- #
@@ -27,9 +27,11 @@ if __name__ == "__main__":
     chainer.config.train = False
 
     # -- load model -- #
-    model_hyperparams_path = os.path.join(gen_params.model_root_path, gen_params.model_hyperparams)
-    model_path = os.path.join(gen_params.model_root_path, gen_params.model_file)
-    model_params = Hyperparameter(model_hyperparams_path)
+    model_hyperparams_path = os.path.join(
+        gen_params.model_root_path, gen_params.model_hyperparams)
+    model_path = os.path.join(
+        gen_params.model_root_path, gen_params.model_file)
+    model_params = Hyperparameter(model_hyperparams_path).subparams("model")
     model = load_model_from(model_path, model_params)
     if device >= 0:
         model.to_gpu(device)
@@ -37,11 +39,13 @@ if __name__ == "__main__":
     # -- load dataset -- #
     atomic_num_list = get_atomic_num_id(gen_params.atom_id_to_atomic_num)
     validation_idxs = get_validation_idxs(gen_params.train_validation_split)
-    dataset = NumpyTupleDataset.load(os.path.join(gen_params.data_root_path, gen_params.dataset))
+    dataset = NumpyTupleDataset.load(os.path.join(
+        gen_params.data_root_path, gen_params.dataset))
     train_idxs = [i for i in range(len(dataset)) if i not in validation_idxs]
     n_train = len(train_idxs)
     train_idxs.extend(validation_idxs)
-    train_set = chainer.datasets.SubDataset(dataset, 0, n_train, order=train_idxs)
+    train_set = chainer.datasets.SubDataset(
+        dataset, 0, n_train, order=train_idxs)
     train_smiles = adj_to_smiles(train_set, atomic_num_list)
 
     # -- random generation -- #
@@ -53,30 +57,47 @@ if __name__ == "__main__":
         os.makedirs(gen_dir, exist_ok=True)
 
     for i in range(num_experiments):
-        x, adj = generate_mols(model, batch_size=gen_params.batch_size, true_adj=None, temp=gen_params.temperature, device=device)
+        x, adj = generate_mols(model, batch_size=gen_params.batch_size,
+                               true_adj=None, temp=gen_params.temperature, device=device)
         val_result = check_validity(x, adj, atomic_num_list, device)
-        novel_ratio.append(check_novelty(val_result["valid_mols"], train_smiles))
+        novel_ratio.append(check_novelty(
+            val_result["valid_mols"], train_smiles))
         unique_ratio.append(val_result["unique_ratio"])
         valid_ratio.append(val_result["valid_ratio"])
         num_valid = len(val_result["valid_mols"])
-    
+
         if save_fig:
-            file_path = os.path.join(gen_dir, "generated_mols_{}.png".format(i))
+            file_path = os.path.join(
+                gen_dir, "generated_mols_{}.png".format(i))
             img = Draw.MolsToGridImage(val_result["valid_mols"], legends=val_result["valid_smiles"],
                                        molsPerRow=20, subImgSize=(300, 300))
             img.save(file_path)
-        
-    log.info("validity: mean={:.2f}%, sd={:.2f}%, vals={}".format(np.mean(valid_ratio), np.std(valid_ratio), valid_ratio))
-    log.info("novelty: mean={:.2f}%, sd={:.2f}%, vals={}".format(np.mean(novel_ratio), np.std(novel_ratio), novel_ratio))
+
+    log.info("validity: mean={:.2f}%, sd={:.2f}%, vals={}".format(
+        np.mean(valid_ratio), np.std(valid_ratio), valid_ratio))
+    log.info("novelty: mean={:.2f}%, sd={:.2f}%, vals={}".format(
+        np.mean(novel_ratio), np.std(novel_ratio), novel_ratio))
     log.info("uniqueness: mean={:.2f}%, sd={:.2f}%, vals={}".format(np.mean(unique_ratio), np.std(unique_ratio),
-                                                                 unique_ratio))
+                                                                    unique_ratio))
 
     mol_smiles = None
-    
+
     # -- Intepolation generation -- #
     if gen_params.draw_neighbor:
         for seed in range(5):
-            filepath = os.path.join(gen_dir, "generated_interpolation_molecules_seed_{}.png".format(seed))
-            log.info("saving {}".format(filepath))
-            pass
-        
+            if save_fig:
+                file_path = os.path.join(
+                    gen_dir, "generated_interpolation_molecules_seed_{}.png".format(seed))
+                log.info("saving {}".format(file_path))
+            else:
+                file_path = None
+            visualize_interpolation(
+                file_path, model, 
+                mol_smiles=mol_smiles, 
+                max_atom=model_params.num_nodes, 
+                out_size=model_params.num_nodes, 
+                mols_per_row=gen_params.mols_per_row,
+                delta=gen_params.delta, 
+                atomic_num_id=atomic_num_list, 
+                seed=seed, mol_dataset=dataset, 
+                save_mol_fig=save_fig, device=device)

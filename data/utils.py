@@ -136,7 +136,7 @@ def atom_shuffle(data):
 
 
 def adj_to_smiles(data: list, atomic_num_list: list) -> list:
-    valid = [Chem.MolToSmiles(construct_mol(x_elem, adj_elem, atomic_num_list))
+    valid = [Chem.MolToSmiles(construct_mol(x_elem.astype(np.int), adj_elem, atomic_num_list))
              for x_elem, adj_elem in data]
     return valid
 
@@ -201,22 +201,77 @@ def get_latent_vec(model, smiles, max_atoms, out_size, atom_id_to_atomic_num):
     return np.hstack([z[0][0].data, z[0][1].data]).squeeze(0)
 
 
+def gen_direction(latent_size):
+    """ get two orthogonal direction """
+    x = np.random.randn(latent_size).astype(np.float32)
+    x /= np.linalg.norm(x)
+
+    y = np.random.randn(latent_size).astype(np.float32)
+    y -= y.dot(x) * x
+    y /= np.linalg.norm(y)
+    return x, y
+
+
+def gen_neiborhood(v, x, y, step, r):
+    step_vec = np.expand_dims(np.arange(-r, r+1, 1, dtype=np.float32) * step, 1) # (2r+1, 1)
+    diff_x = np.matmul(step_vec, np.expand_dims(x, 0)) # (2r+1, w)
+    diff_y = np.matmul(step_vec, np.expand_dims(y, 0)) # (2r+1, w)
+    diff_tensor = np.repeat(diff_x, 2*r+1, 0).reshape(2*r+1, 2*r+1, -1) + np.transpose(np.repeat(diff_y, 2*r+1, 0).reshape(2*r+1, 2*r+1, -1), (1,0,2)) # (2r+1, 2r+1, w)
+    return diff_tensor - v
+
+
+def generate_mols_interpolation(model, z0=None, true_adj=None, device=-1, seed=0, mols_per_row=13, delta=1.):
+    np.random.seed(seed)
+    latent_size = model.adj_size + model.x_size
+    if z0 is None:
+        mu = np.zeros([latent_size], dtype=np.float32)
+        sigma = model.z_var * np.eye(latent_size, dtype=np.float32)
+        z0 = np.random.multivariate_normal(mu, sigma).astype(np.float32)
+    
+    # randomly generate 2 orthonormal axis x & y.
+    x, y = gen_direction(latent_size)
+    interpolations = gen_neiborhood(z0, x, y, delta, mols_per_row // 2).reshape(-1, latent_size)
+    
+    if device >= 0:
+        interpolations = chainer.backends.cuda.to_gpu(interpolations, device)
+
+    x, adj = model.reverse(interpolations.astype(np.float32), true_adj=true_adj)
+    return x, adj
+
+
 def visualize_interpolation(filepath: str, model: chainer.Chain, atomic_num_id: list, max_atom: int, out_size: int, mol_smiles=None, mols_per_row=13,
-                            delta=0.1, seed=0, true_data=None, device=-1):
+                            delta=0.1, seed=0, mol_dataset=None, save_mol_fig=True, device=-1):
     z0 = None
     if mol_smiles is not None:
         z0 = get_latent_vec(model, mol_smiles, max_atom, out_size, atomic_num_id)
     else:
         with chainer.no_backprop_mode():
             np.random.seed(seed)
-            mol_index = np.random.randint(0, len(true_data))
-            adj = np.expand_dims(true_data[mol_index][1], axis=0)
-            x = np.expand_dims(true_data[mol_index], axis=0)
-            z0 = model(x, adj)
-            z0 = np.hstack((z0[0][0].data, z0[0][1].data)).squeeze(0)
+            mol_index = np.random.randint(0, len(mol_dataset))
+            x = np.expand_dims(mol_dataset[mol_index][0], axis=0)
+            adj = np.expand_dims(mol_dataset[mol_index][1], axis=0)
+            if device >= 0:
+                adj = chainer.backends.cuda.to_gpu(adj, device)
+                x = chainer.backends.cuda.to_gpu(x, device)
+            z0 = model(x, adj)[0]
+            if device >= 0:
+                z0 = chainer.backends.cuda.cupy.hstack((z0[0].data, z0[1].data)).squeeze(0)
+                z0 = chainer.backends.cuda.to_cpu(z0).astype(np.float32)
+            else:
+                z0 = np.hstack((z0[0].data, z0[1].data)).squeeze(0)
         
-    x, adj = None
-
+    x, adj = generate_mols_interpolation(model, z0=z0, mols_per_row=mols_per_row, delta=delta, seed=seed, device=device)
+    adj = _to_numpy_array(adj, device=device)
+    x = _to_numpy_array(x, device=device)
+    interpolation_mols = [valid_mol(construct_mol(x_elem, adj_elem, atomic_num_id)) 
+                          for x_elem, adj_elem in zip(x, adj)]
+    valid_mols = [mol for mol in interpolation_mols if mol is not None]
+    print("interpolation_mols valid {}/{}".format(len(valid_mols), len(interpolation_mols)))
+    img = Draw.MolsToGridImage(interpolation_mols, molsPerRow=mols_per_row, subImgSize=(250, 250))
+    if save_mol_fig:
+        img.save(filepath)
+    else:
+        img.show()
 
 
 def _to_numpy_array(x, device=-1):
