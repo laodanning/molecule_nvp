@@ -49,7 +49,7 @@ class AtomEmbedEvaluator(training.extensions.Evaluator):
             with reporter_module.report_scope(observation):
                 xs, adjs = self.converter(batch, self.device)
                 xp = cuda.get_array_module(xs)
-                with function.no_backprop_mode():
+                with chainer.no_backprop_mode(), chainer.using_config("train", False):
                     hs = self.model(xs, adjs)
                     hs = F.reshape(hs, (-1, hs.shape[-1]))
                     xs = xs.reshape(-1)

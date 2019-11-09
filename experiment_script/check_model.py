@@ -12,7 +12,7 @@ from model.nvp_model.nvp_model import AttentionNvpModel
 from data.utils import generate_mols, check_validity, get_atomic_num_id
 
 if __name__ == "__main__":
-    log.basicConfig(level=log.WARNING)
+    log.basicConfig(level=log.WARN)
     parser = argparse.ArgumentParser()
     parser.add_argument("-P", "--params", type=str, default=None, help="path to model hyperparameters.")
     parser.add_argument("-m", "--model", type=str, default=None, help="path to model file.")
@@ -27,22 +27,23 @@ if __name__ == "__main__":
     device = 0
     model.to_gpu(device)
     chainer.backends.cuda.get_device_from_id(device).use()
-    temperatures = np.linspace(0.0, 0.01, num=101, dtype=np.float32)
+    temperatures = np.linspace(0, 1, num=11, dtype=np.float32)
     valids = []
     uniques = []
     times = 5
 
-    for t in temperatures:
-        print(t)
-        temp_valid = []
-        temp_unique = []
-        for _ in range(times):
-            xs, adjs = generate_mols(model, t, batch_size=100, device=device)
-            res = check_validity(xs, adjs, atomic_num_ids, device=device)
-            temp_valid.append(res["valid_ratio"])
-            temp_unique.append(res["unique_ratio"])
-        valids.append(sum(temp_valid) / times)
-        uniques.append(sum(temp_unique) / times)
+    with chainer.no_backprop_mode(), chainer.using_config("train", False):
+        for t in temperatures:
+            temp_valid = []
+            temp_unique = []
+            for _ in range(times):
+                xs, adjs = generate_mols(model, temp=t, batch_size=100, device=device)
+                res = check_validity(xs, adjs, atomic_num_ids, device=device)
+                temp_valid.append(res["valid_ratio"])
+                temp_unique.append(res["unique_ratio"])
+            valids.append(sum(temp_valid) / times)
+            uniques.append(sum(temp_unique) / times)
+            print("temp: {}\tvalid: {}\tunique: {}".format(t, valids[-1], uniques[-1]))
     
     plt.figure()
     plt.grid(True)

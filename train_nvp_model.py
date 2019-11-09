@@ -122,7 +122,7 @@ def train(hyperparams: Hyperparameter):
 
     # -- evaluation function -- #
     def print_validity(trainer):
-        with chainer.using_device(chainer.backends.cuda.get_device_from_id(main_device)):
+        with chainer.using_device(chainer.backends.cuda.get_device_from_id(main_device)), chainer.using_config("train", False):
             save_mol = (get_log_level(output_params.log_level) <= log.DEBUG)
             x, adj = generate_mols(model, batch_size=100,
                                 device=main_device)  # x: atom id
