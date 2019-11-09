@@ -27,7 +27,7 @@ def gen_neiborhood(v, x, y, step, r):
     diff_x = np.matmul(step_vec, np.expand_dims(x, 0)) # (2r+1, w)
     diff_y = np.matmul(step_vec, np.expand_dims(y, 0)) # (2r+1, w)
     diff_tensor = np.repeat(diff_x, 2*r+1, 0).reshape(2*r+1, 2*r+1, -1) + np.transpose(np.repeat(diff_y, 2*r+1, 0).reshape(2*r+1, 2*r+1, -1), (1,0,2)) # (2r+1, 2r+1, w)
-    return diff_tensor - v
+    return v + diff_tensor
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -55,5 +55,7 @@ if __name__ == "__main__":
 
     step = 1e-2
     r = 2
+    print(words[3])
     neighbors = gen_neiborhood(words[3], x, y, step ,r)
+    print(neighbors[2,2])
     print(neighbors.shape)

@@ -217,7 +217,7 @@ def gen_neiborhood(v, x, y, step, r):
     diff_x = np.matmul(step_vec, np.expand_dims(x, 0)) # (2r+1, w)
     diff_y = np.matmul(step_vec, np.expand_dims(y, 0)) # (2r+1, w)
     diff_tensor = np.repeat(diff_x, 2*r+1, 0).reshape(2*r+1, 2*r+1, -1) + np.transpose(np.repeat(diff_y, 2*r+1, 0).reshape(2*r+1, 2*r+1, -1), (1,0,2)) # (2r+1, 2r+1, w)
-    return diff_tensor - v
+    return v + diff_tensor
 
 
 def generate_mols_interpolation(model, z0=None, true_adj=None, device=-1, seed=0, mols_per_row=13, delta=1.):
@@ -245,7 +245,7 @@ def visualize_interpolation(filepath: str, model: chainer.Chain, atomic_num_id: 
     if mol_smiles is not None:
         z0 = get_latent_vec(model, mol_smiles, max_atom, out_size, atomic_num_id)
     else:
-        with chainer.no_backprop_mode():
+        with chainer.no_backprop_mode(), chainer.using_config("train", False):
             np.random.seed(seed)
             mol_index = np.random.randint(0, len(mol_dataset))
             x = np.expand_dims(mol_dataset[mol_index][0], axis=0)
