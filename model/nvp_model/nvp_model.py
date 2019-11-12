@@ -147,8 +147,8 @@ class AttentionNvpModel(chainer.Chain):
         adj_ln_var = self.adj_ln_var * self.xp.ones([self.adj_size])
         x_ln_var = self.x_ln_var * self.xp.ones([self.x_size])
         zA_mean = self.latent_trans(z[0])
-        log_det_jacobians[0] = log_det_jacobians[0] - F.log(self.xp.array([self.x_size], dtype=self.xp.float32))
-        log_det_jacobians[1] = log_det_jacobians[1] - F.log(self.xp.array([self.adj_size], dtype=self.xp.float32))
+        log_det_jacobians[0] = log_det_jacobians[0] - self.x_size
+        log_det_jacobians[1] = log_det_jacobians[1] - self.adj_size
 
         negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], zA_mean, adj_ln_var, reduce="no"), axis=1) - log_det_jacobians[1])
         negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros(
