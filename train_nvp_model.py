@@ -140,7 +140,7 @@ def train(hyperparams: Hyperparameter):
     trainer.extend(extensions.LogReport(filename=output_params.trainlogname))
     trainer.extend(print_validity, trigger=(1, "epoch"))
     trainer.extend(extensions.PrintReport([
-        "epoch", "neg_log_likelihood", "nll_x", "nll_adj", "z_var", "elapsed_time"]))
+        "epoch", "neg_log_likelihood", "nll_x", "nll_adj", "z_var", "ln_det_x", "ln_det_adj", "elapsed_time"]))
     trainer.extend(extensions.ProgressBar())
     
     # -- start train -- #
