@@ -64,11 +64,11 @@ class AffineAdjCoupling(Coupling):
         masked_adj = adj[:, self.mask]
         log_s, t = self._s_t_functions(masked_adj)
         s = F.sigmoid(log_s + 2)
-        log_det_jacobian = F.sum(F.log(F.absolute(s)),
-                                 axis=(2, 3)).reshape(adj.shape[0])
-
         t = F.broadcast_to(t, adj.shape)
         s = F.broadcast_to(s, adj.shape)
+
+        log_det_jacobian = F.sum(F.log(F.absolute(s)),
+                                 axis=(1, 2, 3))
         adj = adj * self.cal_mask + adj * \
             (s * ~self.cal_mask) + t * (~self.cal_mask)
         return adj, log_det_jacobian
@@ -174,12 +174,12 @@ class AffineNodeFeatureCoupling(Coupling):
 
         s, t = self._s_t_functions(masked_x, adj)
         s = F.sigmoid(s + 2)
-        log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=1)
 
         t = F.reshape(t, [batch_size, self.out_size, 1])
         t = F.broadcast_to(t, [batch_size, self.out_size, self.n_features])
         s = F.reshape(s, [batch_size, self.out_size, 1])
         s = F.broadcast_to(s, [batch_size, self.out_size, self.n_features])
+        log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=(1,2))
 
         x = masked_x + x * (s * ~self.mask) + t * ~self.mask
         return x, log_det_jacobian
