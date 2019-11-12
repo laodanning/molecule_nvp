@@ -89,7 +89,7 @@ class AttentionNvpModel(chainer.Chain):
         adj = F.reshape(adj, (adj.shape[0], -1))
         h = F.reshape(h, (h.shape[0], -1))
         out = [h, adj]
-        return out, (sum_log_det_jacobian_x, sum_log_det_jacobian_adj)
+        return out, [sum_log_det_jacobian_x, sum_log_det_jacobian_adj]
 
     def reverse(self, z, true_adj=None):
         """
@@ -138,6 +138,8 @@ class AttentionNvpModel(chainer.Chain):
     def log_prob(self, z, log_det_jacobians):
         ln_var_adj = self.ln_var * self.xp.ones([self.adj_size])
         ln_var_x = self.ln_var * self.xp.ones([self.x_size])
+        log_det_jacobians[0] = log_det_jacobians[0] - F.log(self.xp.array([self.x_size], dtype=self.xp.float32))
+        log_det_jacobians[1] = log_det_jacobians[1] - F.log(self.xp.array([self.adj_size], dtype=self.xp.float32))
 
         negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(
             self.adj_size, dtype=self.xp.float32), ln_var_adj, reduce="no"), axis=1) - log_det_jacobians[1])
@@ -146,6 +148,9 @@ class AttentionNvpModel(chainer.Chain):
 
         negative_log_likelihood_adj /= self.adj_size
         negative_log_likelihood_x /= self.x_size
+
+        if negative_log_likelihood_x.array < 0:
+            log.warning("negative nll for x!")
 
         return [negative_log_likelihood_x, negative_log_likelihood_adj]
 

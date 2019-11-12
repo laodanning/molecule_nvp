@@ -145,6 +145,7 @@ def train(hyperparams: Hyperparameter):
     
     # -- start train -- #
     if hasattr(train_params, "load_snapshot"):
+        log.info("Load snapshot from {}".format(train_params.load_snapshot))
         chainer.serializers.load_npz(train_params.load_snapshot, trainer)
     trainer.run()
     chainer.serializers.save_npz(os.path.join(output_params.root_dir, output_params.final_model_name), model)
