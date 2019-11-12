@@ -30,9 +30,13 @@ class AttentionNvpModel(chainer.Chain):
             assert self.embed_model.word_size == self.hyperparams.num_features
             initial_ln_z_var = math.log(self.hyperparams.initial_z_var)
             if self.hyperparams.learn_dist:
-                self.ln_var = chainer.Parameter(initializer=initial_ln_z_var, shape=[1])
+                # self.ln_var = chainer.Parameter(initializer=initial_ln_z_var, shape=[1])
+                self.x_ln_var = chainer.Parameter(initializer=initial_ln_z_var, shape=[self.x_size])
+                self.adj_ln_var = chainer.Parameter(initializer=initial_ln_z_var, shape=[self.adj_size])
             else:
-                self.ln_var = chainer.Variable(initializer=initial_ln_z_var, shape=[1])
+                # self.ln_var = chainer.Variable(initializer=initial_ln_z_var, shape=[1])
+                self.x_ln_var = chainer.Variable(initializer=initial_ln_z_var, shape=[self.x_size])
+                self.adj_ln_var = chainer.Variable(initializer=initial_ln_z_var, shape=[self.adj_size])
 
             feature_coupling = AdditiveNodeFeatureCoupling if self.hyperparams.additive_feature_coupling else AffineNodeFeatureCoupling
             relation_coupling = AdditiveAdjCoupling if self.hyperparams.additive_relation_coupling else AffineAdjCoupling
@@ -136,15 +140,15 @@ class AttentionNvpModel(chainer.Chain):
         return atom_ids, adj
 
     def log_prob(self, z, log_det_jacobians):
-        ln_var_adj = self.ln_var * self.xp.ones([self.adj_size])
-        ln_var_x = self.ln_var * self.xp.ones([self.x_size])
+        # ln_var_adj = self.ln_var * self.xp.ones([self.adj_size])
+        # ln_var_x = self.ln_var * self.xp.ones([self.x_size])
         log_det_jacobians[0] = log_det_jacobians[0] - F.log(self.xp.array([self.x_size], dtype=self.xp.float32))
         log_det_jacobians[1] = log_det_jacobians[1] - F.log(self.xp.array([self.adj_size], dtype=self.xp.float32))
 
         negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(
-            self.adj_size, dtype=self.xp.float32), ln_var_adj, reduce="no"), axis=1) - log_det_jacobians[1])
+            self.adj_size, dtype=self.xp.float32), self.adj_ln_var, reduce="no"), axis=1) - log_det_jacobians[1])
         negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros(
-            self.x_size, dtype=self.xp.float32), ln_var_x, reduce="no"), axis=1) - log_det_jacobians[0])
+            self.x_size, dtype=self.xp.float32), self.x_ln_var, reduce="no"), axis=1) - log_det_jacobians[0])
 
         negative_log_likelihood_adj /= self.adj_size
         negative_log_likelihood_x /= self.x_size
@@ -182,7 +186,11 @@ class AttentionNvpModel(chainer.Chain):
 
     @property
     def z_var(self):
-        return F.exp(self.ln_var).array[0]
+        return [F.average(F.exp(self.x_ln_var)).array[0], F.average(F.exp(self.adj_ln_var)).array[0]]
+
+    @property
+    def ln_var(self):
+        return F.concat([self.x_ln_var, self.adj_ln_var], axis=0)
 
     def to_gpu(self, device=None):
         super().to_gpu(device=device)

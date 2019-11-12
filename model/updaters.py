@@ -68,7 +68,7 @@ class NVPUpdater(training.StandardUpdater):
                             "nll_x": nll[0], "nll_adj": nll[1], "z_var": self.model.z_var})
         else:
             loss = nll
-            chainer.report({"neg_log_likelihood": loss, "z_var": self.model.z_var})
+            chainer.report({"neg_log_likelihood": loss, "zx_var": self.model.z_var[0], "zA_var": self.model.z_var[1]})
 
         #loss += F.square(F.exp(self.model.ln_var) + F.exp(-self.model.ln_var))
         chainer.report({"ln_det_x": self.model.xp.mean(sum_log_det_jacs[0].array), "ln_det_adj": self.model.xp.mean(sum_log_det_jacs[1].array)})
@@ -143,7 +143,7 @@ class DataParallelNVPUpdater(training.ParallelUpdater):
             loss_in_cpu = F.copy(loss, -1)
             total_loss += loss_in_cpu
         average_losses = total_loss / len(losses)
-        chainer.report({"neg_log_likelihood": average_losses, "z_var": model_main.z_var})
+        chainer.report({"neg_log_likelihood": average_losses, "zx_var": model_main.z_var[0], "zA_var": model_main.z_var[1]})
 
         optimizer.update()
 

@@ -76,8 +76,7 @@ def generate_mols(model: chainer.Chain, temp=0.5, z_mu=None, batch_size=20, true
     sigma_diag = xp.ones([z_dim])
 
     if model.hyperparams.learn_dist:
-        sigma_diag = xp.sqrt(xp.exp(model.ln_var.data)) * sigma_diag
-        # sigma_diag = xp.exp(xp.hstack((model.ln_var_x.data, model.ln_var_adj.data)))
+        sigma_diag = xp.sqrt(xp.exp(model.ln_var.data))
 
     sigma = temp * sigma_diag
 
