@@ -6,6 +6,7 @@ from model.atom_embed.atom_embed import atom_embed_model
 from model.hyperparameter import Hyperparameter
 from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
     AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
+from model.nvp_model.mlp import MLP
 
 import math
 import os
@@ -54,6 +55,7 @@ class AttentionNvpModel(chainer.Chain):
                                   batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.mlp_channels)
                 for i in range(self.hyperparams.num_coupling["relation"])])
             self.clinks = chainer.ChainList(*clinks)
+            self.latent_trans = MLP([self.adj_size, self.adj_size], in_size=self.x_size)
 
         # load and fix embed model
         chainer.serializers.load_npz(
@@ -95,7 +97,7 @@ class AttentionNvpModel(chainer.Chain):
         out = [h, adj]
         return out, [sum_log_det_jacobian_x, sum_log_det_jacobian_adj]
 
-    def reverse(self, z, true_adj=None):
+    def reverse(self, z, true_adj=None, norm_sample=True):
         """
         Returns a molecule, given its latent vector.
         :param z: latent vector. Shape: [B, N*N*M + N*T]
@@ -107,6 +109,8 @@ class AttentionNvpModel(chainer.Chain):
         batch_size = z.shape[0]
         with chainer.no_backprop_mode():
             z_x, z_adj = F.split_axis(chainer.as_variable(z), [self.x_size], 1)
+            if norm_sample: 
+                z_adj += self.latent_trans(z_x)
 
             if true_adj is None:
                 h_adj = F.reshape(z_adj, (batch_size, self.hyperparams.num_edge_types,
@@ -142,15 +146,13 @@ class AttentionNvpModel(chainer.Chain):
     def log_prob(self, z, log_det_jacobians):
         adj_ln_var = self.adj_ln_var * self.xp.ones([self.adj_size])
         x_ln_var = self.x_ln_var * self.xp.ones([self.x_size])
-        # ln_var_adj = self.ln_var * self.xp.ones([self.adj_size])
-        # ln_var_x = self.ln_var * self.xp.ones([self.x_size])
+        zA_mean = self.latent_trans(z[0])
         log_det_jacobians[0] = log_det_jacobians[0] - F.log(self.xp.array([self.x_size], dtype=self.xp.float32))
         log_det_jacobians[1] = log_det_jacobians[1] - F.log(self.xp.array([self.adj_size], dtype=self.xp.float32))
 
-        negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(
-            self.adj_size, dtype=self.xp.float32), self.adj_ln_var, reduce="no"), axis=1) - log_det_jacobians[1])
+        negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], zA_mean, adj_ln_var, reduce="no"), axis=1) - log_det_jacobians[1])
         negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros(
-            self.x_size, dtype=self.xp.float32), self.x_ln_var, reduce="no"), axis=1) - log_det_jacobians[0])
+            self.x_size, dtype=self.xp.float32), x_ln_var, reduce="no"), axis=1) - log_det_jacobians[0])
 
         negative_log_likelihood_adj /= self.adj_size
         negative_log_likelihood_x /= self.x_size

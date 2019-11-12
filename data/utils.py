@@ -234,7 +234,7 @@ def generate_mols_interpolation(model, z0=None, true_adj=None, device=-1, seed=0
     if device >= 0:
         interpolations = chainer.backends.cuda.to_gpu(interpolations, device)
 
-    x, adj = model.reverse(interpolations.astype(np.float32), true_adj=true_adj)
+    x, adj = model.reverse(interpolations.astype(np.float32), true_adj=true_adj, norm_sample=False)
     return x, adj
 
 
