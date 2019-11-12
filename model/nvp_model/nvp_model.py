@@ -186,7 +186,7 @@ class AttentionNvpModel(chainer.Chain):
 
     @property
     def z_var(self):
-        return [F.average(F.exp(self.x_ln_var)).array[0], F.average(F.exp(self.adj_ln_var)).array[0]]
+        return [F.average(F.exp(self.x_ln_var)).array, F.average(F.exp(self.adj_ln_var)).array]
 
     @property
     def ln_var(self):

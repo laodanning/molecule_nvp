@@ -65,7 +65,7 @@ class NVPUpdater(training.StandardUpdater):
         if self.two_step:
             loss = self.h_nll_weight * nll[0] + nll[1]
             chainer.report({"neg_log_likelihood": loss,
-                            "nll_x": nll[0], "nll_adj": nll[1], "z_var": self.model.z_var})
+                            "nll_x": nll[0], "nll_adj": nll[1], "zx_var": self.model.z_var[0], "zA_var": self.model.z_var[1]})
         else:
             loss = nll
             chainer.report({"neg_log_likelihood": loss, "zx_var": self.model.z_var[0], "zA_var": self.model.z_var[1]})
