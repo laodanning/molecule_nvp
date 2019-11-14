@@ -197,6 +197,14 @@ class AttentionNvpModel(chainer.Chain):
         adj_ln_var = self.adj_ln_var * self.xp.ones([self.adj_size])
         x_ln_var = self.x_ln_var * self.xp.ones([self.x_size])
         return F.concat([x_ln_var, adj_ln_var], axis=0)
+    
+    @property
+    def x_var(self):
+        return F.exp(self.x_ln_var).array[0]
+    
+    @property
+    def adj_var(self):
+        return F.exp(self.adj_ln_var).array[0]
 
     def to_gpu(self, device=None):
         super().to_gpu(device=device)

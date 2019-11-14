@@ -221,18 +221,33 @@ def gen_neiborhood(v, x, y, step, r):
 
 def generate_mols_interpolation(model, z0=None, true_adj=None, device=-1, seed=0, mols_per_row=13, delta=1.):
     np.random.seed(seed)
-    latent_size = model.adj_size + model.x_size
+    adj_size, x_size = model.adj_size, model.x_size
+    latent_size = adj_size + x_size
+    build_from_raw = False
     if z0 is None:
-        mu = np.zeros([latent_size], dtype=np.float32)
-        sigma = model.z_var * np.eye(latent_size, dtype=np.float32)
-        z0 = np.random.multivariate_normal(mu, sigma).astype(np.float32)
-    
-    # randomly generate 2 orthonormal axis x & y.
-    x, y = gen_direction(latent_size)
-    interpolations = gen_neiborhood(z0, x, y, delta, mols_per_row // 2).reshape(-1, latent_size)
-    
+        build_from_raw = True
+        zx_mu = np.zeros([x_size], dtype=np.float32)
+        zx_sigma = float(model.x_var) * np.eye(x_size, dtype=np.float32)
+        zx = np.random.multivariate_normal(zx_mu, zx_sigma).astype(np.float32)
+    else:
+        zx, zadj_true = np.split(z0, [x_size])
+
+    x, y = gen_direction(x_size)
+    interpolations_x = gen_neiborhood(zx, x, y, delta, mols_per_row // 2).reshape(-1, x_size)
+
     if device >= 0:
-        interpolations = chainer.backends.cuda.to_gpu(interpolations, device)
+        interpolations_x = chainer.backends.cuda.to_gpu(interpolations_x, device)
+        if not z0 is None:
+            zadj_true = chainer.backends.cuda.to_gpu(zadj_true, device)
+
+    interpolations_adj = model.latent_trans(interpolations_x).array
+    xp = chainer.backends.cuda.get_array_module(interpolations_adj)
+    if z0 is None:
+        zadj_sigma = float(model.adj_var) * xp.eye(adj_size, dtype=np.float32)
+        interpolations_adj += xp.random.multivariate_normal(xp.zeros([adj_size]), zadj_sigma).astype(xp.float32)
+    else:
+        interpolations_adj = interpolations_adj - interpolations_adj[interpolations_adj.shape[0] // 2] + zadj_true
+    interpolations = xp.concatenate([interpolations_x, interpolations_adj], axis=-1)
 
     x, adj = model.reverse(interpolations.astype(np.float32), true_adj=true_adj, norm_sample=False)
     return x, adj
