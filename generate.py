@@ -61,7 +61,7 @@ if __name__ == "__main__":
                                true_adj=None, temp=gen_params.temperature, device=device)
         val_result = check_validity(x, adj, atomic_num_list, device)
         novel_ratio.append(check_novelty(
-            val_result["valid_mols"], train_smiles))
+            val_result["valid_smiles"], train_smiles))
         unique_ratio.append(val_result["unique_ratio"])
         valid_ratio.append(val_result["valid_ratio"])
         num_valid = len(val_result["valid_mols"])
