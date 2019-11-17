@@ -8,6 +8,7 @@ import rdkit
 from rdkit import Chem
 from rdkit.Chem import Draw
 from rdkit.Chem.rdchem import Atom, RWMol
+from chainer_chemistry.datasets import NumpyTupleDataset
 
 import data.relational_graph_preprocessor as molecule_preprocessor
 
@@ -301,6 +302,21 @@ def _to_numpy_array(x, device=-1):
 
 def save_mol_png(mol, filepath, size=(600, 600)):
     Draw.MolToFile(mol, filepath, size=size)
+
+
+def load_dataset(dataset_path, validation_idxs):
+    dataset = NumpyTupleDataset.load(dataset_path)
+    if validation_idxs:
+        train_idxs = [i for i in range(
+            len(dataset)) if i not in validation_idxs]
+        trainset_size = len(train_idxs)
+        train_idxs.extend(validation_idxs)
+        trainset, valset = chainer.datasets.split_dataset(
+            dataset, trainset_size, train_idxs)
+    else:
+        trainset, valset = chainer.datasets.split_dataset_random(
+            dataset, int(len(dataset) * 0.8), seed=777)
+    return trainset, valset, dataset
 
 
 if __name__ == "__main__":
