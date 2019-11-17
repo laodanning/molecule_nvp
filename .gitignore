@@ -106,6 +106,9 @@ data/models/
 dataset/
 output/
 
+# experiments
+experiments/
+
 # dev test
 dev_test.py
 config/*test.json
