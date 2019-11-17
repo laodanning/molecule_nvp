@@ -154,8 +154,7 @@ class AtomEmbedModel(chainer.Chain):
     def embedding(self, x):
         return self.embed(x)
     
-    def atomid(self, words, adj):
-        # return F.argmax(self.rgcn(words, adj), axis=-1)
+    def atomid(self, words):
         return self.embed.atom_id(words)
     
     def word_channel_stds(self):

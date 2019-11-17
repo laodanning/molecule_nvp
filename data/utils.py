@@ -102,7 +102,7 @@ def construct_mol(atom_id, A, atomic_num_list):
         mol.AddAtom(Atom(int(atom)))
 
     # A (edge_type, num_node, num_node)
-    adj = np.argmax(A, axis=0) # exclude "None" edge
+    adj = np.argmax(A, axis=0)
     adj = adj[exist_matrix].reshape(len(atomic_num), len(atomic_num))
     for i, j in zip(*np.nonzero(adj)):
         if i > j:
