@@ -56,6 +56,7 @@ class AttentionNvpModel(chainer.Chain):
                 for i in range(self.hyperparams.num_coupling["relation"])])
             self.clinks = chainer.ChainList(*clinks)
             self.latent_trans = MLP([self.adj_size, self.adj_size], in_size=self.x_size)
+            # self.latent_trans = MLP([256, 512, self.adj_size], in_size=self.x_size)
 
         # load and fix embed model
         chainer.serializers.load_npz(
@@ -78,9 +79,14 @@ class AttentionNvpModel(chainer.Chain):
         sum_log_det_jacobian_adj = chainer.as_variable(
             self.xp.zeros([h.shape[0]], dtype=self.xp.float32))
 
+        # Input adj DOES NOT have self loop, we add self loop here for computation.
+        adj += self.xp.eye(self.hyperparams.num_nodes)
+
         # forward step for channel-coupling layers
         for i in range(self.hyperparams.num_coupling["feature"]):
+            log.debug("\n---\nStart {}th coupling layer".format(i))
             h, log_det_jacobians = self.clinks[i](h, adj)
+            log.debug("After {}th coupling layer: {}".format(i, h.array))
             sum_log_det_jacobian_x += log_det_jacobians
 
         # add uniform noise to adjacency tensors
@@ -126,21 +132,25 @@ class AttentionNvpModel(chainer.Chain):
                 adj = adj / 2
                 # 2. apply normalization along edge type axis and choose the most likely edge type.
                 adj = F.softmax(adj, axis=1)
-                max_bond = F.broadcast_to(
-                    F.max(adj, axis=1, keepdims=True), shape=adj.shape)
-                adj = adj // max_bond
+                max_bond = F.repeat(F.max(adj, axis=1).reshape(batch_size, -1, self.hyperparams.num_nodes, self.hyperparams.num_nodes),
+                                    self.hyperparams.num_edge_types, axis=1)
+                adj = F.floor(adj / max_bond)
             else:
                 adj = true_adj
+                adj += self.xp.eye(self.hyperparams.num_nodes)
 
             h_x = F.reshape(
                 z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
 
             # feature coupling layers
             for i in reversed(range(self.hyperparams.num_coupling["feature"])):
+                log.debug("\n---\nStart {}th r-coupling layer".format(i))
                 h_x, _ = self.clinks[i].reverse(h_x, adj)
+                log.debug("After {}th r-coupling layer: {}".format(i, h_x.array))
 
-            atom_ids = self.embed_model.atomid(h_x, adj)
+            atom_ids = self.embed_model.atomid(h_x)
 
+        adj *= (1 - self.xp.eye(self.hyperparams.num_nodes)) # remove self-loop
         return atom_ids, adj
 
     def log_prob(self, z, log_det_jacobians):
