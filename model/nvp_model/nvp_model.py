@@ -135,10 +135,11 @@ class AttentionNvpModel(chainer.Chain):
                 max_bond = F.repeat(F.max(adj, axis=1).reshape(batch_size, -1, self.hyperparams.num_nodes, self.hyperparams.num_nodes),
                                     self.hyperparams.num_edge_types, axis=1)
                 adj = F.floor(adj / max_bond)
+                adj *= (1 - self.xp.eye(self.hyperparams.num_nodes)) # remove wrong self-loop    
             else:
                 adj = true_adj
-                adj += self.xp.eye(self.hyperparams.num_nodes)
-
+            
+            adj += self.xp.eye(self.hyperparams.num_nodes)
             h_x = F.reshape(
                 z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
 
