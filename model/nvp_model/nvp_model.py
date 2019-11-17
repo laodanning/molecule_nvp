@@ -89,6 +89,9 @@ class AttentionNvpModel(chainer.Chain):
             log.debug("After {}th coupling layer: {}".format(i, h.array))
             sum_log_det_jacobian_x += log_det_jacobians
 
+        # remove self-loop
+        adj -= self.xp.eye(self.hyperparams.num_nodes)
+
         # add uniform noise to adjacency tensors
         if chainer.config.train:
             adj += self.xp.random.uniform(0, 0.9, adj.shape)
