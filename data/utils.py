@@ -102,7 +102,7 @@ def construct_mol(atom_id, A, atomic_num_list):
         mol.AddAtom(Atom(int(atom)))
 
     # A (edge_type, num_node, num_node)
-    adj = np.argmax(A, axis=0)
+    adj = np.argmax(A, axis=0) # exclude "None" edge
     adj = adj[exist_matrix].reshape(len(atomic_num), len(atomic_num))
     for i, j in zip(*np.nonzero(adj)):
         if i > j:
@@ -223,33 +223,36 @@ def generate_mols_interpolation(model, z0=None, true_adj=None, device=-1, seed=0
     np.random.seed(seed)
     adj_size, x_size = model.adj_size, model.x_size
     latent_size = adj_size + x_size
-    build_from_raw = False
     if z0 is None:
-        build_from_raw = True
         zx_mu = np.zeros([x_size], dtype=np.float32)
         zx_sigma = float(model.x_var) * np.eye(x_size, dtype=np.float32)
         zx = np.random.multivariate_normal(zx_mu, zx_sigma).astype(np.float32)
     else:
         zx, zadj_true = np.split(z0, [x_size])
 
-    x, y = gen_direction(x_size)
-    interpolations_x = gen_neiborhood(zx, x, y, delta, mols_per_row // 2).reshape(-1, x_size)
+    x, y = gen_direction(latent_size)
+    zx_x, zadj_x = np.split(x, [x_size])
+    zx_y, zadj_y = np.split(y, [x_size])
+    interpolations_x = gen_neiborhood(zx, zx_x, zx_y, delta, mols_per_row // 2).reshape(-1, x_size)
+    adj_steps = gen_neiborhood(np.zeros([adj_size], dtype=np.float32), zadj_x, zadj_y, delta, mols_per_row // 2).reshape(-1, adj_size)
 
     if device >= 0:
         interpolations_x = chainer.backends.cuda.to_gpu(interpolations_x, device)
+        adj_steps = chainer.backends.cuda.to_gpu(adj_steps, device)
         if not z0 is None:
             zadj_true = chainer.backends.cuda.to_gpu(zadj_true, device)
 
     interpolations_adj = model.latent_trans(interpolations_x).array
     xp = chainer.backends.cuda.get_array_module(interpolations_adj)
     if z0 is None:
-        zadj_sigma = float(model.adj_var) * xp.eye(adj_size, dtype=np.float32)
+        zadj_sigma = model.adj_var * xp.eye(adj_size, dtype=np.float32)
         interpolations_adj += xp.random.multivariate_normal(xp.zeros([adj_size]), zadj_sigma).astype(xp.float32)
     else:
         interpolations_adj = interpolations_adj - interpolations_adj[interpolations_adj.shape[0] // 2] + zadj_true
+    interpolations_adj += adj_steps
+    # assert xp.prod(xp.equal(interpolations_adj[interpolations_adj.shape[0] // 2], zadj_true))
     interpolations = xp.concatenate([interpolations_x, interpolations_adj], axis=-1)
-
-    x, adj = model.reverse(interpolations.astype(np.float32), true_adj=true_adj, norm_sample=False)
+    x, adj = model.reverse(interpolations, true_adj=true_adj, norm_sample=False)
     return x, adj
 
 
