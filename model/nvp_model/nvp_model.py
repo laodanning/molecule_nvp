@@ -80,17 +80,14 @@ class AttentionNvpModel(chainer.Chain):
             self.xp.zeros([h.shape[0]], dtype=self.xp.float32))
 
         # Input adj DOES NOT have self loop, we add self loop here for computation.
-        adj += self.xp.eye(self.hyperparams.num_nodes)
+        adj_self_connect = adj + self.xp.eye(self.hyperparams.num_nodes)
 
         # forward step for channel-coupling layers
         for i in range(self.hyperparams.num_coupling["feature"]):
             log.debug("\n---\nStart {}th coupling layer".format(i))
-            h, log_det_jacobians = self.clinks[i](h, adj)
+            h, log_det_jacobians = self.clinks[i](h, adj_self_connect)
             log.debug("After {}th coupling layer: {}".format(i, h.array))
             sum_log_det_jacobian_x += log_det_jacobians
-
-        # remove self-loop
-        adj -= self.xp.eye(self.hyperparams.num_nodes)
 
         # add uniform noise to adjacency tensors
         if chainer.config.train:
@@ -142,19 +139,17 @@ class AttentionNvpModel(chainer.Chain):
             else:
                 adj = true_adj
             
-            adj += self.xp.eye(self.hyperparams.num_nodes)
+            adj_self_connect = adj + self.xp.eye(self.hyperparams.num_nodes)
             h_x = F.reshape(
                 z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
 
             # feature coupling layers
             for i in reversed(range(self.hyperparams.num_coupling["feature"])):
                 log.debug("\n---\nStart {}th r-coupling layer".format(i))
-                h_x, _ = self.clinks[i].reverse(h_x, adj)
+                h_x, _ = self.clinks[i].reverse(h_x, adj_self_connect)
                 log.debug("After {}th r-coupling layer: {}".format(i, h_x.array))
 
             atom_ids = self.embed_model.atomid(h_x)
-
-        adj *= (1 - self.xp.eye(self.hyperparams.num_nodes)) # remove self-loop
         return atom_ids, adj
 
     def log_prob(self, z, log_det_jacobians):
