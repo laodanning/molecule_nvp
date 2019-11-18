@@ -10,7 +10,7 @@ from model.atom_embed import atom_embed
 from model.hyperparameter import Hyperparameter
 from model.nvp_model.nvp_model import AttentionNvpModel
 from data.utils import generate_mols, check_validity, get_atomic_num_id, \
-    check_novelty, get_validation_idxs, adj_to_smiles
+    check_novelty, get_validation_idxs, adj_to_smiles, load_dataset
 from chainer_chemistry.datasets import NumpyTupleDataset
 
 if __name__ == "__main__":
@@ -25,14 +25,13 @@ if __name__ == "__main__":
     dataset_params = global_params.subparams("dataset")
 
     # -- load dataset -- #
-    validation_idxs = get_validation_idxs(os.path.join(config_params.root_dir, config_params.train_validation_split))
-    dataset = NumpyTupleDataset.load(os.path.join(
-        dataset_params.root_dir, dataset_params.name))
-    train_idxs = [i for i in range(len(dataset)) if i not in validation_idxs]
-    n_train = len(train_idxs)
-    train_idxs.extend(validation_idxs)
-    train_set = chainer.datasets.SubDataset(
-        dataset, 0, n_train, order=train_idxs)
+    if config_params.has("train_validation_split"):
+        validation_idxs = get_validation_idxs(os.path.join(
+            config_params.root_dir, config_params.train_validation_split))
+    else:
+        validation_idxs = None
+    train_set, validation_set, dataset = load_dataset(os.path.join(
+        dataset_params.root_dir, dataset_params.name), validation_idxs)
     atomic_num_ids = get_atomic_num_id(os.path.join(config_params.root_dir, config_params.atom_id_to_atomic_num))
     train_smiles = adj_to_smiles(train_set, atomic_num_ids)
 
