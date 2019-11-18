@@ -90,9 +90,11 @@ def generate_mols(model: chainer.Chain, temp=0.5, z_mu=None, batch_size=20, true
     return x, adj
 
 
-def construct_mol(atom_id, A, atomic_num_list):
+def construct_mol(atom_id: np.ndarray, A, atomic_num_list):
     mol = RWMol()
     atomic_num_list = np.array(atomic_num_list, dtype=np.int)
+    if atom_id.dtype != np.int:
+        atom_id = atom_id.astype(np.int)
     atomic_num = list(filter(lambda x: x > 0, atomic_num_list[atom_id]))
     atoms_exist = np.array(
         list(map(lambda x: x > 0, atomic_num_list[atom_id]))).astype(np.bool)
@@ -106,7 +108,7 @@ def construct_mol(atom_id, A, atomic_num_list):
     adj = np.argmax(A, axis=0)
     adj = adj[exist_matrix].reshape(len(atomic_num), len(atomic_num))
     for i, j in zip(*np.nonzero(adj)):
-        if i > j:
+        if i > j and adj[i, j] > 0:
             mol.AddBond(int(i), int(j), adj_to_bond_type[adj[i, j]])
     return mol
 
@@ -136,7 +138,7 @@ def atom_shuffle(data):
 
 
 def adj_to_smiles(data: list, atomic_num_list: list) -> list:
-    valid = [Chem.MolToSmiles(construct_mol(x_elem.astype(np.int), adj_elem, atomic_num_list))
+    valid = [Chem.MolToSmiles(construct_mol(x_elem.astype(np.int), adj_elem, atomic_num_list), isomericSmiles=False, canonical=True)
              for x_elem, adj_elem in data]
     return valid
 
