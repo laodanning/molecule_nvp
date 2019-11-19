@@ -16,8 +16,9 @@
         "trainlogname": "trainlog",
         "saved_mol_dir": "result_mol",
         "log_level": "info",
-        "final_model_name": "attention-nvp_final.npz",
-        "logname": "log"
+        "final_model_name": "molecule_nvp_relgcn.npz",
+        "logname": "log",
+        "hyperparams_name": "hyperparams_relgcn.json"
     },
     "model":
     {
@@ -32,9 +33,12 @@
             "feature": 40,
             "relation": 40
         },
-        "num_attention_types": 8,
-        "num_gat_layers": 2,
-        "gnn_channels": [256, 64],
+        "gnn_type": "relgcn",
+        "gnn_params": {
+            "ch_list": [16, 128],
+            "scale_adj": true
+        },
+        "gnn_fc_channels": [256, 64],
         "learn_dist": true,
         "mlp_channels": [1024, 512],
         "additive_feature_coupling": false,
@@ -45,7 +49,7 @@
     "train":
     {
         "device": 0,
-        "batch_size": 128,
+        "batch_size": 1024,
         "num_epoch": 200,
         "save_epoch": 10,
         "optimizer": "adam",

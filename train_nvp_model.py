@@ -32,7 +32,7 @@ def train(hyperparams: Hyperparameter):
                         filemode="w", level=get_log_level(output_params.log_level))
     else:
         log.basicConfig(level=get_log_level(output_params.log_level))
-    hyperparams.save(os.path.join(output_params.root_dir, "hyperparams.json"))
+    hyperparams.save(os.path.join(output_params.root_dir, output_params.hyperparams_name))
     atomic_num_list = get_atomic_num_id(os.path.join(config_params.root_dir, config_params.atom_id_to_atomic_num))
     
     data_parallel = False

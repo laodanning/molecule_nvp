@@ -17,7 +17,8 @@
         "saved_mol_dir": "result_mol",
         "log_level": "info",
         "final_model_name": "molecule_nvp_relgcn.npz",
-        "logname": "log"
+        "logname": "log",
+        "hyperparams_name": "hyperparams_relgcn.json"
     },
     "model":
     {
