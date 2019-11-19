@@ -45,8 +45,8 @@ class AttentionNvpModel(chainer.Chain):
                 feature_coupling(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features,
                                  self.masks["feature"][i %
                                                        self.hyperparams.num_features],
-                                 batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.gnn_channels,
-                                 n_attention=self.hyperparams.num_attention_types, gat_layers=self.hyperparams.num_gat_layers)
+                                 batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.gnn_fc_channels,
+                                 gnn_type=self.hyperparams.gnn_type, gnn_params=self.hyperparams.gnn_params)
                 for i in range(self.hyperparams.num_coupling["feature"])]
             clinks.extend([
                 relation_coupling(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features,

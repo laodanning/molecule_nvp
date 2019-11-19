@@ -1,0 +1,58 @@
+{
+    "dataset":
+    {
+        "root_dir": "./dataset",
+        "name": "qm9_relgraph_kekulized.npz"
+    },
+    "configuration":
+    {
+        "root_dir": "./config",
+        "atom_id_to_atomic_num": "atomic_num_qm9.json",
+        "train_validation_split": "validation_idx_qm9.json"
+    },
+    "output":
+    {
+        "root_dir": "./output/qm9",
+        "trainlogname": "trainlog",
+        "saved_mol_dir": "result_mol",
+        "log_level": "info",
+        "final_model_name": "molecule_nvp_gat.npz",
+        "logname": "log"
+    },
+    "model":
+    {
+        "embed_model_path": "./output/qm9/final_embed_model.npz",
+        "embed_model_hyper": "./output/qm9/atom_embed_model_hyper.json",
+        "num_edge_types": 4,
+        "num_features": 8,
+        "num_nodes": 9,
+        "apply_batchnorm": true,
+        "num_coupling":
+        {
+            "feature": 32,
+            "relation": 28
+        },
+        "gnn_type": "gat",
+        "gnn_params": {
+            "num_attention_types": 4,
+            "num_gat_layers": 2
+        },
+        "gnn_fc_channels": [128, 64],
+        "learn_dist": true,
+        "mlp_channels": [256, 256],
+        "additive_feature_coupling": false,
+        "additive_relation_coupling": false,
+        "feature_noise_scale": 0.01,
+        "initial_z_var": 0.1
+    },
+    "train":
+    {
+        "device": 0,
+        "batch_size": 256,
+        "num_epoch": 200,
+        "save_epoch": 10,
+        "optimizer": "adam",
+        "two_step": true,
+        "h_nll_weight": 1
+    }
+}

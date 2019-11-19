@@ -5,6 +5,7 @@ import chainer.links as L
 
 from model.nvp_model.mlp import MLP
 from model.nvp_model.gat import RelationalGAT
+from model.nvp_model.relgcn import RelGCN
 
 
 class Coupling(chainer.Chain):
@@ -154,14 +155,21 @@ class AffineNodeFeatureCoupling(Coupling):
     """
 
     def __init__(self, n_nodes, n_relations, n_features, mask,
-                 batch_norm=False, ch_list=None, n_attention=4, gat_layers=4):
+                 batch_norm=False, ch_list=None, gnn_type="relgcn",
+                 gnn_params=None):
         super().__init__(n_nodes, n_relations, n_features, mask, batch_norm=batch_norm)
         self.ch_list = ch_list
         self.out_size = n_nodes
+        supported_gnn = ["relgcn", "gat"]
+        assert gnn_type in supported_gnn
         with self.init_scope():
-            self.rgat = RelationalGAT(
-                out_dim=ch_list[0], n_edge_types=n_relations,
-                n_heads=n_attention, hidden_dim=n_features, n_layers=gat_layers)
+            if gnn_type == "relgcn":
+                self.gnn = RelGCN(out_channels=ch_list[0], num_edge_type=n_relations, gnn_params=gnn_params)
+            elif gnn_type == "gat":
+                self.gnn = RelationalGAT(
+                    out_dim=ch_list[0], n_edge_types=n_relations, hidden_dim=n_features, gnn_params=gnn_params)
+            else:
+                raise ValueError("Unsupported GNN type {}, supported types are {}".format(gnn_type, supported_gnn))
             self.linear1 = L.Linear(ch_list[0], out_size=ch_list[1])
             self.linear2 = L.Linear(
                 ch_list[1], out_size=2*self.out_size, initialW=1e-10)
@@ -199,7 +207,7 @@ class AffineNodeFeatureCoupling(Coupling):
         return out, None
 
     def _s_t_functions(self, x, adj):
-        y = self.rgat(x, adj)
+        y = self.gnn(x, adj)
         if self.apply_bn:
             y = self.batch_norm(y)
         y = self.linear1(y)
@@ -213,14 +221,21 @@ class AffineNodeFeatureCoupling(Coupling):
 
 class AdditiveNodeFeatureCoupling(Coupling):
     def __init__(self, n_nodes, n_relations, n_features, mask,
-                 batch_norm=False, ch_list=None, n_attention=4, gat_layers=4):
+                 batch_norm=False, ch_list=None, gnn_type="relgcn",
+                 gnn_params=None):
         super().__init__(n_nodes, n_relations, n_features, mask, batch_norm=batch_norm)
         self.ch_list = ch_list
         self.out_size = n_nodes
+        supported_gnn = ["relgcn", "gat"]
+        assert gnn_type in supported_gnn
         with self.init_scope():
-            self.rgat = RelationalGAT(
-                out_dim=ch_list[0], n_edge_types=n_relations,
-                n_heads=n_attention, hidden_dim=n_features, n_layers=gat_layers)
+            if gnn_type == "relgcn":
+                self.gnn = RelGCN(out_channels=ch_list[0], num_edge_type=n_relations, gnn_params=gnn_params)
+            elif gnn_type == "gat":
+                self.gnn = RelationalGAT(
+                    out_dim=ch_list[0], n_edge_types=n_relations, hidden_dim=n_features, gnn_params=gnn_params)
+            else:
+                raise ValueError("Unsupported GNN type {}, supported types are {}".format(gnn_type, supported_gnn))
             self.linear1 = L.Linear(ch_list[0], out_size=ch_list[1])
             self.linear2 = L.Linear(
                 ch_list[1], out_size=self.out_size, initialW=1e-10)
@@ -246,7 +261,7 @@ class AdditiveNodeFeatureCoupling(Coupling):
         return z, None
 
     def _s_t_functions(self, x, adj):
-        y = self.rgat(x, adj)
+        y = self.gnn(x, adj)
         if self.apply_bn:
             y = self.batch_norm(y)
         y = self.linear1(y)

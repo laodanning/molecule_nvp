@@ -2,7 +2,7 @@
     "model_root_path": "./output/qm9",
     "data_root_path": "./dataset",
     "output_root_path": "./output/qm9",
-    "model_file": "attention-nvp_final.npz",
+    "model_file": "molecule_nvp_relgcn.npz",
     "model_hyperparams": "hyperparams.json",
     "device": 0,
     "dataset": "qm9_relgraph_kekulized.npz",

@@ -36,12 +36,16 @@ class RelationalGAT(chainer.Chain):
         weight_tying (bool): enable weight_tying or not
 
     """
-    def __init__(self, out_dim, hidden_dim, n_heads=3, 
-                 negative_slope=0.2, n_edge_types=4, n_layers=4, 
+    def __init__(self, out_dim, hidden_dim,
+                 negative_slope=0.2, n_edge_types=4,
                  dropout_ratio=-1, activation=F.tanh,
                  softmax_mode="across", concat_hidden=False,
-                 concat_heads=True, weight_tying=False):
+                 concat_heads=True, weight_tying=False, gnn_params=None):
         super(RelationalGAT, self).__init__()
+        if gnn_params is None:
+            gnn_params = {}
+        n_layers = gnn_params.get("num_gat_layers", 2)
+        n_heads = gnn_params.get("num_attention_types", 3)
         n_readout_layer = n_layers if concat_hidden else 1
         n_message_layer = n_layers
         with self.init_scope():
