@@ -6,13 +6,14 @@ from chainer_chemistry.datasets import NumpyTupleDataset
 from chainer_chemistry.dataset.preprocessors import RSGCNPreprocessor, GGNNPreprocessor
 from data.relational_graph_preprocessor import RelationalGraphPreprocessor
 from data.get_qm9 import get_qm9
+from data.get_zinc import get_zinc250k
 from data.utils import get_atomic_num_id
 
 
 def parse():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--data_name", type=str, default="qm9",
-                        choices=["qm9"],
+                        choices=["qm9", "zinc250k"],
                         help="dataset to be downloaded")
     parser.add_argument("--data_type", type=str, default="relgraph",
                         choices=["relgraph"],)
@@ -31,8 +32,9 @@ print("args", vars(args))
 if data_name == "qm9":
     max_atoms = 9
     id_to_atomic = get_atomic_num_id("./config/atomic_num_qm9.json")
-# elif data_name == "zinc250k":
-#     max_atoms = 38
+elif data_name == "zinc250k":
+    max_atoms = 38
+    id_to_atomic = get_atomic_num_id("./config/atomic_num_zinc.json")
 else:
     raise ValueError("[ERROR] Unexpected value data_name={}".format(data_name))
 
@@ -49,8 +51,8 @@ print("Save dataset '{}' with format '{}' in '{}' as '{}'".format(data_name, dat
 
 if data_name == 'qm9':
     dataset = get_qm9(preprocessor)
-# elif data_name == 'zinc250k':
-#     dataset = datasets.get_zinc250k(preprocessor)
+elif data_name == 'zinc250k':
+    dataset = get_zinc250k(preprocessor)
 else:
     raise ValueError("[ERROR] Unexpected value data_name={}".format(data_name))
 

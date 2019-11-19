@@ -1,0 +1,21 @@
+{
+    "config_dir": "./config",
+    "dataset_dir": "./dataset",
+    "train_validation_split": "validation_idx_zinc.json",
+    "atom_id_to_atomic_num": "atomic_num_zinc.json",
+    "dataset": "zinc250k_relgraph_kekulized.npz",
+    "out_dir": "./output/zinc",
+    "device": 0,
+
+    "embed_word_size": 10,
+    "molecule_size": 38,
+    "num_atom_type": 10,
+    "kekulize": true,
+    "layers": [16],
+    "scale_adj": true,
+
+    "num_epoch": 10,
+    "batch_size": 512,
+    "optimizer": "adam",
+    "log_name": "embed_train_log"
+}
