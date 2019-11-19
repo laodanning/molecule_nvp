@@ -11,7 +11,7 @@ from chainer_chemistry.datasets import NumpyTupleDataset
 from data.utils import get_validation_idxs, generate_mols,\
      check_validity, get_atomic_num_id, save_mol_png
 from model.atom_embed.atom_embed import AtomEmbedModel
-from model.nvp_model.nvp_model import AttentionNvpModel
+from model.nvp_model.nvp_model import MoleculeNVPModel
 from model.updaters import NVPUpdater, DataParallelNVPUpdater
 from model.evaluators import AtomEmbedEvaluator
 from model.utils import get_and_log, get_optimizer, set_log_level, get_log_level
@@ -79,7 +79,7 @@ def train(hyperparams: Hyperparameter):
         valset, train_params.batch_size, repeat=False, shuffle=False)
 
     # -- model -- #
-    model = AttentionNvpModel(model_params)
+    model = MoleculeNVPModel(model_params)
     if isinstance(device, dict):
         log.info("Using multi-GPU {}".format(device))
         model.to_gpu(main_device)

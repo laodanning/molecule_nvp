@@ -12,9 +12,9 @@ import math
 import os
 import logging as log
 
-class AttentionNvpModel(chainer.Chain):
+class MoleculeNVPModel(chainer.Chain):
     def __init__(self, hyperparams):
-        super(AttentionNvpModel, self).__init__()
+        super(MoleculeNVPModel, self).__init__()
         self.hyperparams = hyperparams
         self.masks = dict()
         self.masks["relation"] = self._create_masks("relation")

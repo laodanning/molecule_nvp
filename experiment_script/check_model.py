@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from model.atom_embed import atom_embed
 from model.hyperparameter import Hyperparameter
-from model.nvp_model.nvp_model import AttentionNvpModel
+from model.nvp_model.nvp_model import MoleculeNVPModel
 from data.utils import generate_mols, check_validity, get_atomic_num_id, \
     check_novelty, get_validation_idxs, adj_to_smiles, load_dataset
 from chainer_chemistry.datasets import NumpyTupleDataset
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     atomic_num_ids = get_atomic_num_id(os.path.join(config_params.root_dir, config_params.atom_id_to_atomic_num))
     train_smiles = adj_to_smiles(train_set, atomic_num_ids)
 
-    model = AttentionNvpModel(model_params)
+    model = MoleculeNVPModel(model_params)
     model.load_from(args.model)
     device = 0
     model.to_gpu(device)

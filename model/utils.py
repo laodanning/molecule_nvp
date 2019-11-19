@@ -3,7 +3,7 @@ from chainer import optimizers
 import chainer
 import chainer.backends.cuda as cuda
 import chainer.functions as F
-from model.nvp_model.nvp_model import AttentionNvpModel
+from model.nvp_model.nvp_model import MoleculeNVPModel
 
 def get_and_log(config, key, default_value=None, required=False):
     value = config.get(key, default_value)
@@ -37,7 +37,7 @@ def get_log_level(str_level: str) -> int:
 def load_model_from(path: str, model_params) -> chainer.Chain:
     log.info("loading model from '{}'".format(path))
     log.debug("Hyperparams: \n{}\n".format(model_params))
-    model = AttentionNvpModel(model_params)
+    model = MoleculeNVPModel(model_params)
     if path.endswith(".npz"):
         chainer.serializers.load_npz(path, model)
     else:
