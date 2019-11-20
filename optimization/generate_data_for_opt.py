@@ -152,7 +152,7 @@ def generate(config: Hyperparameter, output_path: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config_path", type=str, default="./output/qm9/hyperparams.json", help="path to coniguration file")
+    parser.add_argument("-c", "--config_path", type=str, default="./output/qm9/hyperparams_relgcn.json", help="path to coniguration file")
     parser.add_argument("-o", "--output_path", type=str, default="./dataset/data_for_opt/qm9", help="output root path")
     args = parser.parse_args()
     config = Hyperparameter(args.config_path)

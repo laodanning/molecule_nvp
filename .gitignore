@@ -117,3 +117,6 @@ dev_test/
 
 # vscode
 .vscode/
+
+# some repo used for test
+climin/
