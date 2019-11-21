@@ -11,7 +11,7 @@ from chainer_chemistry.dataset.preprocessors.atomic_number_preprocessor import A
 download_url = 'https://raw.githubusercontent.com/aspuru-guzik-group/chemical_vae/master/models/zinc_properties/250k_rndm_zinc_drugs_clean_3.csv'  # NOQA
 file_name_250k = 'zinc250k.csv'
 
-_root = 'molecule_dataset/zinc250k'
+_root = 'molecular_dataset/zinc250k'
 
 _label_names = ['logP', 'qed', 'SAS']
 _smiles_column_names = ['smiles']
