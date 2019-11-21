@@ -119,6 +119,10 @@ def valid_mol(x):
         return s
     return None
 
+def is_valid_smiles(smiles):
+    if smiles is None: return False
+    s = Chem.MolFromSmiles(smiles)
+    return s is not None and '.' not in smiles
 
 @chainer.dataset.converter()
 def molecule_id_converter(batch, device):
