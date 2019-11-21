@@ -7,6 +7,7 @@ from model.hyperparameter import Hyperparameter
 from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
     AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
 from model.nvp_model.mlp import BasicMLP
+from data.utils import *
 
 import math
 import os
@@ -199,6 +200,9 @@ class MoleculeNVPModel(chainer.Chain):
                 return False
             return True
         raise ValueError("{} does not exist.".format(path))
+
+    def input_from_smiles(self, smiles, atomic_num_list):
+        return smiles_to_adj(smiles, self.hyperparams.num_nodes, self.hyperparams.num_nodes, atomic_num_list)
 
     @property
     def z_var(self):
