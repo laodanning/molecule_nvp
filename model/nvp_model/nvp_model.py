@@ -56,7 +56,7 @@ class MoleculeNVPModel(chainer.Chain):
                 for i in range(self.hyperparams.num_coupling["relation"])])
             self.clinks = chainer.ChainList(*clinks)
             if self.adj_size > 512:
-                latent_trans_layers = [512, 1024]
+                latent_trans_layers = [512, self.adj_size]
             else:
                 latent_trans_layers = [self.adj_size, self.adj_size]
             self.latent_trans = BasicMLP(latent_trans_layers, in_size=self.x_size)
