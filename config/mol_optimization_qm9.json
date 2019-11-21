@@ -1,0 +1,33 @@
+{
+    "nvp_model_path": "output/qm9/molecule_nvp_relgcn.npz",
+    "nvp_hyperparams": "output/qm9/hyperparams_relgcn.json",
+    "mol_dataset": "dataset/qm9_relgraph_kekulized.npz",
+    "atomic_num_list": "config/atomic_num_qm9.json",
+    "target": [
+        {"name": "logP", "weight": 1.0},
+        {"name": "SA_scales", "weight": 0.5},
+        {"name": "cycle_scales", "weight": 0.5}
+    ],
+    "latent_dataset": 
+    {
+        "train": "dataset/data_for_opt/qm9/mol_opt_data_train.npz",
+        "validation": "dataset/data_for_opt/qm9/mol_opt_data_val.npz"
+    },
+    "model": 
+    {
+        "ch_list": [1024, 512]
+    },
+    "output":
+    {
+        "root": "output/qm9/mol_optimization",
+        "hyperparams": "hyperparams.json",
+        "model_name": "mol_optimization.npz"
+    },
+    "train":
+    {
+        "batch_size": 256,
+        "num_epoch": 10,
+        "device": 0,
+        "optimizer": "adam"
+    }
+}
