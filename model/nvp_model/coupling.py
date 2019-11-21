@@ -3,7 +3,7 @@ import chainer.backends.cuda as cuda
 import chainer.functions as F
 import chainer.links as L
 
-from model.nvp_model.mlp import MLP
+from model.nvp_model.mlp import BasicMLP
 from model.nvp_model.gat import RelationalGAT
 from model.nvp_model.relgcn import RelGCN
 
@@ -53,7 +53,7 @@ class AffineAdjCoupling(Coupling):
         self.cal_mask = self.mask.reshape(n_relations, 1, 1)
 
         with self.init_scope():
-            self.mlp = MLP(ch_list, in_size=self.in_size, activation=F.relu)
+            self.mlp = BasicMLP(ch_list, in_size=self.in_size, activation=F.relu)
             self.linear = L.Linear(
                 ch_list[-1], out_size=2 * self.out_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0., shape=[1])
@@ -108,7 +108,7 @@ class AdditiveAdjCoupling(Coupling):
         self.cal_mask = self.mask.reshape(n_relations, 1, 1)
 
         with self.init_scope():
-            self.mlp = MLP(ch_list, in_size=self.in_size, activation=F.relu)
+            self.mlp = BasicMLP(ch_list, in_size=self.in_size, activation=F.relu)
             self.linear = L.Linear(
                 ch_list[-1], out_size=self.out_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0., shape=[1])

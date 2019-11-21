@@ -6,7 +6,7 @@ from model.atom_embed.atom_embed import atom_embed_model
 from model.hyperparameter import Hyperparameter
 from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
     AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
-from model.nvp_model.mlp import MLP
+from model.nvp_model.mlp import BasicMLP
 
 import math
 import os
@@ -55,8 +55,11 @@ class MoleculeNVPModel(chainer.Chain):
                                   batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.mlp_channels)
                 for i in range(self.hyperparams.num_coupling["relation"])])
             self.clinks = chainer.ChainList(*clinks)
-            self.latent_trans = MLP([self.adj_size, self.adj_size], in_size=self.x_size)
-            # self.latent_trans = MLP([256, 512, self.adj_size], in_size=self.x_size)
+            if self.adj_size > 512:
+                latent_trans_layers = [512, 1024]
+            else:
+                latent_trans_layers = [self.adj_size, self.adj_size]
+            self.latent_trans = BasicMLP(latent_trans_layers, in_size=self.x_size)
 
         # load and fix embed model
         chainer.serializers.load_npz(
