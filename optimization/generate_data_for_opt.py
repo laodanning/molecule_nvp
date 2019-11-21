@@ -18,6 +18,7 @@ from model.hyperparameter import Hyperparameter
 from model.utils import load_model_from
 from chainer_chemistry.datasets import NumpyTupleDataset
 
+
 def process_dataset(dataset, model, atomic_num_list, batch_size, device):
     # -- model hyperparams -- #
     model_params = model.hyperparams
@@ -66,10 +67,10 @@ def process_dataset(dataset, model, atomic_num_list, batch_size, device):
     SA_scores = np.array(SA_scores, dtype=np.float32)
     cycle_scores = np.array(cycle_scores, dtype=np.float32)
 
-    logP_values_normalized = (logP_values - np.mean(logP_values)) / np.std(logP_values)
-    QED_values_normalized = (QED_values - np.mean(QED_values)) / np.std(QED_values)
-    SA_scores_normalized = (SA_scores - np.mean(SA_scores)) / np.std(SA_scores)
-    cycle_scores_normalized = (cycle_scores - np.mean(cycle_scores)) / np.std(cycle_scores)
+    logP_stats = {"mean": np.mean(logP_values), "std": np.std(logP_values)}
+    QED_stats = {"mean": np.mean(QED_values), "std": np.std(QED_values)}
+    SA_scores_stats = {"mean": np.mean(SA_scores), "std": np.std(SA_scores)}
+    cycle_scores_state = {"mean": np.mean(cycle_scores), "std": np.std(cycle_scores)}
 
     valid_set = NumpyTupleDataset(valid_xs, valid_adjs)
     batch_iter = chainer.iterators.SerialIterator(
@@ -100,10 +101,18 @@ def process_dataset(dataset, model, atomic_num_list, batch_size, device):
     opt_datas = {
         "smiles": valid_smiles,
         "latent_vecs": latent_vecs,
-        "logPs": logP_values_normalized,
-        "QEDs": QED_values_normalized,
-        "SA_scales": SA_scores_normalized,
-        "cycle_scores": cycle_scores_normalized
+        "targets": {
+            "logPs": logP_values,
+            "QEDs": QED_values,
+            "SA_scales": SA_scores,
+            "cycle_scores": cycle_scores
+        },
+        "stats": {
+            "logPs": logP_stats,
+            "QEDs": QED_stats,
+            "SA_scales": SA_scores_stats,
+            "cycle_scores": cycle_scores_state
+        }
     }
     return opt_datas
 
