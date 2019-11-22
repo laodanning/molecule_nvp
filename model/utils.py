@@ -12,7 +12,7 @@ def get_and_log(config, key, default_value=None, required=False):
     log.info("{}:\t{}".format(key, value))
     return value
 
-def get_optimizer(opt_type: str):
+def get_optimizer(opt_type: str) -> chainer.Optimizer:
     if opt_type == "adam":
         return optimizers.Adam
     elif opt_type == "momentum":

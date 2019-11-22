@@ -1,7 +1,7 @@
 import json
 import logging as log
 import os
-
+import pickle
 import chainer
 import numpy as np
 import rdkit
@@ -324,6 +324,14 @@ def load_dataset(dataset_path, validation_idxs):
             dataset, int(len(dataset) * 0.8), seed=777)
     return trainset, valset, dataset
 
+
+def pickle_load(path):
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+def pickle_save(path, obj):
+    with open(path, "wb") as f:
+        pickle.dump(obj, f)
 
 if __name__ == "__main__":
     N = 3
