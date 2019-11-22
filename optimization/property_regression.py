@@ -20,10 +20,10 @@ class PropertyRegression(chainer.Chain):
             ch_list = []
         self.ch_list = ch_list + [1]
         with self.init_scope():
-            self.mlp = MLP(ch_list, latent_size)
+            self.mlp = MLP(self.ch_list, latent_size)
         
     def __call__(self, z) -> chainer.Variable:
-        return self.mlp(z)
+        return self.mlp(z).reshape(-1)
     
     def adjust_input(self, x, step_size):
         h = x
@@ -32,6 +32,7 @@ class PropertyRegression(chainer.Chain):
         
         with chainer.using_config("train", False):
             y = self.__call__(h)
+            y.grad = self.xp.ones(y.shape, dtype=self.xp.float32)
             y.backward(retain_grad=True)
             grad = h.grad()
         
@@ -51,6 +52,6 @@ class Regression(chainer.Chain):
     def forward(self, x, t):
         self.y = self.model(x)
         self.loss = self.loss_func(self.y, t)
-        acc = chainer.functions.mean(chainer.functions.absolute(self.y - t) / t)
-        chainer.report({"loss": self.loss, "acc": acc}, self)
+        err = chainer.functions.mean(chainer.functions.absolute(self.y - t / t))
+        chainer.report({"loss": self.loss, "err": err}, self)
         return self.loss

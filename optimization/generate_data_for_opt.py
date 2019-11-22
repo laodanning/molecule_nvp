@@ -2,6 +2,7 @@ import argparse
 import logging as log
 import os
 import sys
+import pickle
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import chainer
@@ -13,7 +14,7 @@ from tqdm import tqdm
 
 import optimization.sascorer as sascorer
 from data.utils import (adj_to_smiles, get_atomic_num_id, get_validation_idxs,
-                        load_dataset, molecule_id_converter, construct_mol)
+                        load_dataset, molecule_id_converter, construct_mol, pickle_save)
 from model.hyperparameter import Hyperparameter
 from model.utils import load_model_from
 from chainer_chemistry.datasets import NumpyTupleDataset
@@ -104,13 +105,13 @@ def process_dataset(dataset, model, atomic_num_list, batch_size, device):
         "targets": {
             "logPs": logP_values,
             "QEDs": QED_values,
-            "SA_scales": SA_scores,
+            "SA_scores": SA_scores,
             "cycle_scores": cycle_scores
         },
         "stats": {
             "logPs": logP_stats,
             "QEDs": QED_stats,
-            "SA_scales": SA_scores_stats,
+            "SA_scores": SA_scores_stats,
             "cycle_scores": cycle_scores_state
         }
     }
@@ -155,8 +156,8 @@ def generate(config: Hyperparameter, output_path: str) -> None:
     validation_opt_data = process_dataset(validation_set, model, atomic_num_list, batch_size, device)
 
     # -- save -- #
-    np.savez(os.path.join(output_path, "mol_opt_data_train.npz"), train_opt_data)
-    np.savez(os.path.join(output_path, "mol_opt_data_val.npz"), validation_opt_data)
+    pickle_save(os.path.join(output_path, "mol_opt_data_train.pkl"), train_opt_data)
+    pickle_save(os.path.join(output_path, "mol_opt_data_val.pkl"), validation_opt_data)
 
 
 if __name__ == "__main__":
