@@ -4,14 +4,14 @@
     "mol_dataset": "dataset/qm9_relgraph_kekulized.npz",
     "atomic_num_list": "config/atomic_num_qm9.json",
     "target": [
-        {"name": "logP", "weight": 1.0},
-        {"name": "SA_scales", "weight": 0.5},
-        {"name": "cycle_scales", "weight": 0.5}
+        {"name": "logPs", "weight": 1.0},
+        {"name": "SA_scores", "weight": 0.5},
+        {"name": "cycle_scores", "weight": 0.5}
     ],
     "latent_dataset": 
     {
-        "train": "dataset/data_for_opt/qm9/mol_opt_data_train.npz",
-        "validation": "dataset/data_for_opt/qm9/mol_opt_data_val.npz"
+        "train": "dataset/data_for_opt/qm9/mol_opt_data_train.pkl",
+        "validation": "dataset/data_for_opt/qm9/mol_opt_data_val.pkl"
     },
     "model": 
     {
@@ -26,8 +26,9 @@
     "train":
     {
         "batch_size": 256,
-        "num_epoch": 10,
+        "num_epoch": 100,
         "device": 0,
-        "optimizer": "adam"
+        "weight_decay": 1e-5,
+        "train_log_file": "trainlog"
     }
 }
