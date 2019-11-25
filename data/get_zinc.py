@@ -41,9 +41,11 @@ def get_zinc250k(preprocessor=None, labels=None, return_smiles=False,
         `preprocess_method`.
 
     """
-    labels = labels or get_zinc250k_label_names()
     if isinstance(labels, str):
-        labels = [labels, ]
+        if labels == "default":
+            labels = get_zinc250k_label_names()
+        else:
+            labels = [labels, ]
 
     def postprocess_label(label_list):
         # This is regression task, cast to float value.
