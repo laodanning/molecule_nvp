@@ -6,13 +6,11 @@ import pickle
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import chainer
-import networkx as nx
 import numpy as np
-from rdkit.Chem import (QED, Crippen, Descriptors, Draw, MolFromSmiles,
-                        MolToSmiles, rdmolops)
+from rdkit.Chem import (Draw, MolFromSmiles, MolToSmiles, rdmolops)
 from tqdm import tqdm
 
-import optimization.sascorer as sascorer
+from optimization.utils import cycle_score, logP_score, QED_score, SA_score
 from data.utils import (adj_to_smiles, get_atomic_num_id, get_validation_idxs,
                         load_dataset, molecule_id_converter, construct_mol, pickle_save)
 from model.hyperparameter import Hyperparameter
@@ -48,20 +46,11 @@ def process_dataset(dataset, model, atomic_num_list, batch_size, device):
 
     log.info("Getting target values...")
     for mol in tqdm(valid_mols):
-        logP_values.append(Crippen.MolLogP(mol, includeHs=True) if mol is not None else None)
-        QED_values.append(QED.qed(mol) if mol is not None else None)
-        SA_scores.append(-sascorer.calculateScore(mol) if mol is not None else None)
-        
-        cycle_list = nx.cycle_basis(nx.Graph(rdmolops.GetAdjacencyMatrix(mol)))
-        if len(cycle_list) == 0:
-            cycle_length = 0
-        else:
-            cycle_length = max([ len(j) for j in cycle_list ])
-        if cycle_length <= 6:
-            cycle_length = 0
-        else:
-            cycle_length = cycle_length - 6
-        cycle_scores.append(-cycle_length)
+        logP_values.append(logP_score(mol))
+        QED_values.append(QED_score(mol))
+        SA_scores.append(SA_score(mol))
+        cycle_scores.append(cycle_score(mol))
+
     
     logP_values = np.array(logP_values, dtype=np.float32)
     QED_values = np.array(QED_values, dtype=np.float32)

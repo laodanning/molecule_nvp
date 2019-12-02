@@ -1,7 +1,10 @@
 import numpy as np
 import chainer
 import chainer.functions as F
-
+import networkx as nx
+from optimization import sascorer
+from rdkit.Chem import (QED, Crippen, Descriptors, Draw, MolFromSmiles,
+                        MolToSmiles, rdmolops)
 
 def compute_EI(f_min, mean, std, jitter=0.01):
     """Computes the Expected Improvement
@@ -50,3 +53,27 @@ def compute_EI_with_grad(f_min, mean, std, dmean, dstd, jitter=0.01):
     f_acqu = std * (u * norm_cdf_value + norm_pdf_value)
     df_acqu = dstd * norm_pdf_value - norm_cdf_value * dmean
     return f_acqu, df_acqu
+
+
+def cycle_score(mol):
+    if mol is None:
+        return None
+    cycle_list = nx.cycle_basis(nx.Graph(rdmolops.GetAdjacencyMatrix(mol)))
+    if len(cycle_list) == 0:
+            cycle_length = 0
+    else:
+        cycle_length = max([ len(j) for j in cycle_list ])
+    if cycle_length <= 6:
+        cycle_length = 0
+    else:
+        cycle_length = cycle_length - 6
+    return -cycle_length
+
+def logP_score(mol):
+    return Crippen.MolLogP(mol, includeHs=True) if mol is not None else None
+
+def QED_score(mol):
+    return QED.qed(mol) if mol is not None else None
+
+def SA_score(mol):
+    return sascorer.calculateScore(mol) if mol is not None else None

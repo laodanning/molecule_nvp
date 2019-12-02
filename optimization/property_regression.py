@@ -34,7 +34,7 @@ class PropertyRegression(chainer.Chain):
             y = self.__call__(h)
             y.grad = self.xp.ones(y.shape, dtype=self.xp.float32)
             y.backward(retain_grad=True)
-            grad = h.grad()
+            grad = h.grad
         
         direction = grad / self.xp.linalg.norm(grad, axis=-1, keepdims=True)
         return x + direction * step_size

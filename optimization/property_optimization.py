@@ -10,7 +10,37 @@ from data.utils import *
 from model.utils import *
 from model.hyperparameter import Hyperparameter
 from chainer.datasets import TupleDataset
+from rdkit.Chem import Draw
+import rdkit.Chem
+from optimization.utils import (logP_score, QED_score, SA_score, cycle_score)
 from optimization.property_regression import Regression, PropertyRegression
+
+target_funcs = {
+    "logPs": logP_score,
+    "QEDs": QED_score,
+    "SA_scores": SA_score,
+    "cycle_scores": cycle_score
+}
+
+def get_target_function(targets):
+    target_list = []
+    for t in targets:
+        name = t["name"]
+        weight = t["weight"]
+        if name in target_funcs:
+            target_list.append({"func": target_funcs[name], "weight": weight})
+        else:
+            log.warning("Cannot find target function named '{}', we will ignore it.".format(name))
+    
+    def target_f(mol):
+        if mol is None: 
+            return None
+        t_value = 0.0
+        for t in target_list:
+            t_value += t["func"](mol) * t["weight"]
+        return t_value
+
+    return target_f
 
 def process_smiles(smiles):
     return smiles if is_valid_smiles(smiles) else None
@@ -98,6 +128,7 @@ def mol_property_optimization(config: Hyperparameter, input_smiles: str):
     output_config = config.subparams("output")
     model_path = os.path.join(output_config.root, output_config.model_name)
     atomic_num_list = get_atomic_num_id(config.atomic_num_list)
+    target_function = get_target_function(config.target)
 
     # -- load nvp model -- #
     nvp_model_hyperparams = Hyperparameter(config.nvp_hyperparams).subparams("model")
@@ -125,14 +156,21 @@ def mol_property_optimization(config: Hyperparameter, input_smiles: str):
         input_adj = chainer.backends.cuda.to_gpu(input_adj, device)
     with chainer.no_backprop_mode():
         input_z = chainer.functions.hstack(nvp_model(input_x, input_adj)[0])
-    print(input_z.shape)
 
-    step_size = 0.01
-    num_iter = 5
-    mols = []
+    step_size = config.step_size
+    num_iter = config.num_step
+    mols = [Chem.MolFromSmiles(input_smiles)]
     for i in range(num_iter):
         input_z = model.adjust_input(input_z, step_size)
-        
+        result_x, result_adj = nvp_model.reverse(input_z, norm_sample=False)
+        result_x = chainer.backends.cuda.to_cpu(result_x.array[0])
+        result_adj = chainer.backends.cuda.to_cpu(result_adj.array[0])
+        mol = valid_mol(construct_mol(result_x, result_adj, atomic_num_list))
+        mols.append(mol)
+    t_values = ["{}".format(target_function(mol)) for mol in mols]
+    img = Draw.MolsToGridImage(mols, molsPerRow=len(mols), subImgSize=(250, 250), legends=t_values)
+    img.show()
+
 
 def property_optimization(args):
     # -- decode configurations -- #
