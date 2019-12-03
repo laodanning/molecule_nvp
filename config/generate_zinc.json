@@ -1,0 +1,20 @@
+{
+    "model_root_path": "./output/zinc",
+    "data_root_path": "./dataset",
+    "output_root_path": "./output/zinc",
+    "model_file": "molecule_nvp_relgcn.npz",
+    "model_hyperparams": "hyperparams_relgcn.json",
+    "device": 0,
+    "dataset": "zinc250k_relgraph_kekulized.npz",
+    "train_validation_split": "./config/validation_idx_zinc.json",
+    "atom_id_to_atomic_num": "./config/atomic_num_zinc.json",
+    "batch_size": 1000,
+    "mols_per_row": 13,
+    "delta": 0.05,
+    "num_experiments": 5,
+    "temperature": 0.72,
+    "seed": null,
+    "debug": true,
+    "save_fig": true,
+    "draw_neighbor": true
+}
