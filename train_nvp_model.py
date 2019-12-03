@@ -2,6 +2,7 @@ import argparse
 import json
 import logging as log
 import os
+import random
 
 import chainer
 from chainer import training
@@ -9,7 +10,7 @@ from chainer.training import extensions
 from chainer_chemistry.datasets import NumpyTupleDataset
 
 from data.utils import get_validation_idxs, generate_mols,\
-     check_validity, get_atomic_num_id, save_mol_png
+     check_validity, get_atomic_num_id, save_mol_png, load_periodic_table
 from model.atom_embed.atom_embed import AtomEmbedModel
 from model.nvp_model.nvp_model import MoleculeNVPModel
 from model.updaters import NVPUpdater, DataParallelNVPUpdater
@@ -54,6 +55,7 @@ def train(hyperparams: Hyperparameter):
     log.info("output hyperparameters:\n{}\n".format(output_params))
 
     # -- build dataset -- #
+    periodic_table = load_periodic_table()
     if config_params.has("train_validation_split"):
         validation_idxs = get_validation_idxs(os.path.join(
             config_params.root_dir, config_params.train_validation_split))
@@ -129,6 +131,12 @@ def train(hyperparams: Hyperparameter):
             valid_mols = check_validity(
                 x, adj, atomic_num_list=atomic_num_list, device=main_device)
             if save_mol:
+                sample_index = random.randint(0, 99)
+                sample = x[sample_index].array
+                sample = chainer.backends.cuda.to_cpu(sample)
+                x_str = map(lambda a: atomic_num_list[a], sample)
+                x_str = list(map(lambda a: periodic_table.loc[a]["symbol"] if a != atomic_num_list[-1] else None, x_str))
+                log.debug(x_str)
                 mol_dir = os.path.join(output_params.root_dir, output_params.saved_mol_dir,
                                     "generated_{}".format(trainer.updater.epoch))
                 os.makedirs(mol_dir, exist_ok=True)

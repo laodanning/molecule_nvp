@@ -4,6 +4,7 @@ import os
 import pickle
 import chainer
 import numpy as np
+import pandas as pd
 import rdkit
 from rdkit import Chem
 from rdkit.Chem import Draw
@@ -332,6 +333,9 @@ def pickle_load(path):
 def pickle_save(path, obj):
     with open(path, "wb") as f:
         pickle.dump(obj, f)
+
+def load_periodic_table(path="./config/elementlist.csv"):
+    return pd.read_csv(path, names=["atomic_id", "symbol", "name"], index_col=0)
 
 if __name__ == "__main__":
     N = 3
