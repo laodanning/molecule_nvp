@@ -93,9 +93,9 @@ class MoleculeNVPModel(chainer.Chain):
 
         # forward step for channel-coupling layers
         for i in range(self.hyperparams.num_coupling["feature"]):
-            log.debug("\n---\nStart {}th coupling layer".format(i))
+            #log.debug("\n---\nStart {}th coupling layer".format(i))
             h, log_det_jacobians = self.clinks[i](h, adj_forward)
-            log.debug("After {}th coupling layer: {}".format(i, h.array))
+            #log.debug("After {}th coupling layer: {}".format(i, h.array))
             sum_log_det_jacobian_x += log_det_jacobians
 
         # add uniform noise to adjacency tensors
@@ -154,9 +154,9 @@ class MoleculeNVPModel(chainer.Chain):
 
             # feature coupling layers
             for i in reversed(range(self.hyperparams.num_coupling["feature"])):
-                log.debug("\n---\nStart {}th r-coupling layer".format(i))
+                #log.debug("\n---\nStart {}th r-coupling layer".format(i))
                 h_x, _ = self.clinks[i].reverse(h_x, adj_forward)
-                log.debug("After {}th r-coupling layer: {}".format(i, h_x.array))
+                #log.debug("After {}th r-coupling layer: {}".format(i, h_x.array))
 
             atom_ids = self.embed_model.atomid(h_x)
         return atom_ids, adj
