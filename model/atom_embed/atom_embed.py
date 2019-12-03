@@ -48,7 +48,23 @@ class AtomEmbed(chainer.Chain):
             words = self.embed(self.id_trans_fn(x))
         return words
 
-    def atom_id(self, x):
+    def atom_id(self, x, cos_dist=False):
+        # x size: (batch_size, num_atom, word_size)
+        # W siez: (num_atom_types, word_size)
+        if cos_dist:
+            return self.cosine_dist(x)
+        else:
+            return self.euclidean_dist(x)
+
+    def euclidean_dist(self, x):
+        word_matrix = self.embed.W
+        x_shape = x.shape
+        w_shape = word_matrix.shape
+        compute_x = F.broadcast_to(F.reshape(x, (x_shape[0], x_shape[1], 1, x_shape[2])), (x_shape[0], x_shape[1], w_shape[0], x_shape[2]))
+        diff = F.sum(F.square(compute_x - word_matrix), axis=-1)
+        return F.argmin(diff, axis=-1)
+
+    def cosine_dist(self, x):
         # x size: (batch_size, num_atom, word_size)
         # W siez: (num_atom_types, word_size)
         word_matrix = self.embed.W
@@ -81,14 +97,14 @@ class AtomEmbedRGCNUpdate(chainer.Chain):
         batch_size, num_node, num_channel = h.shape
 
         # --- self connection ---
-        hs = self.graph_linear_self(h)
+        # hs = self.graph_linear_self(h)
         # --- relational feature, from neighbor connection
         m = self.graph_linear_edge(h)
         m = F.reshape(m, (batch_size, num_node, self.out_channel, self.num_edge_type))
         m = F.transpose(m, (0, 3, 1, 2)) # N x num_edge_type x n x F_out
         hr = F.matmul(adj, m) # adj[N x num_edge_type x n x n]
         hr = F.sum(hr, axis=1)
-        return hr + hs
+        return hr
 
 
 class AtomEmbedRGCN(chainer.Chain):

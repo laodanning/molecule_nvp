@@ -20,6 +20,8 @@ class MoleculeNVPModel(chainer.Chain):
         self.masks = dict()
         self.masks["relation"] = self._create_masks("relation")
         self.masks["feature"] = self._create_masks("feature")
+        assert self.hyperparams.gnn_type in ["relgcn", "gat"]
+        self.add_self_loop = self.hyperparams.gnn_type == "gat"
         self.adj_size = self.hyperparams.num_nodes * \
             self.hyperparams.num_nodes * self.hyperparams.num_edge_types
         self.x_size = self.hyperparams.num_nodes * self.hyperparams.num_features
@@ -84,12 +86,15 @@ class MoleculeNVPModel(chainer.Chain):
             self.xp.zeros([h.shape[0]], dtype=self.xp.float32))
 
         # Input adj DOES NOT have self loop, we add self loop here for computation.
-        adj_self_connect = adj + self.xp.eye(self.hyperparams.num_nodes)
+        if self.add_self_loop:
+            adj_forward = adj + self.xp.eye(self.hyperparams.num_nodes)
+        else:
+            adj_forward = adj
 
         # forward step for channel-coupling layers
         for i in range(self.hyperparams.num_coupling["feature"]):
             log.debug("\n---\nStart {}th coupling layer".format(i))
-            h, log_det_jacobians = self.clinks[i](h, adj_self_connect)
+            h, log_det_jacobians = self.clinks[i](h, adj_forward)
             log.debug("After {}th coupling layer: {}".format(i, h.array))
             sum_log_det_jacobian_x += log_det_jacobians
 
@@ -143,14 +148,14 @@ class MoleculeNVPModel(chainer.Chain):
             else:
                 adj = true_adj
             
-            adj_self_connect = adj + self.xp.eye(self.hyperparams.num_nodes)
+            adj_forward = adj + self.xp.eye(self.hyperparams.num_nodes) if self.add_self_loop else adj
             h_x = F.reshape(
                 z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
 
             # feature coupling layers
             for i in reversed(range(self.hyperparams.num_coupling["feature"])):
                 log.debug("\n---\nStart {}th r-coupling layer".format(i))
-                h_x, _ = self.clinks[i].reverse(h_x, adj_self_connect)
+                h_x, _ = self.clinks[i].reverse(h_x, adj_forward)
                 log.debug("After {}th r-coupling layer: {}".format(i, h_x.array))
 
             atom_ids = self.embed_model.atomid(h_x)
