@@ -67,7 +67,7 @@ class MoleculeNVPModel(chainer.Chain):
         # load and fix embed model
         chainer.serializers.load_npz(
             self.hyperparams.embed_model_path, self.embed_model)
-        self.embed_model.disable_update()
+        #self.embed_model.disable_update()
         self.word_channel_stds = self.embed_model.word_channel_stds()
 
     def __call__(self, x, adj):
