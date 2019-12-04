@@ -248,3 +248,6 @@ class MoleculeNVPModel(chainer.Chain):
             self.word_channel_stds)
         for clink in self.clinks:
             clink.to_cpu()
+    
+    def save_embed(self):
+        chainer.serializers.save_npz(self.hyperparams.embed_model_path, self.embed_model)

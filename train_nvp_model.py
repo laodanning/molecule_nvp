@@ -157,7 +157,7 @@ def train(hyperparams: Hyperparameter):
         chainer.serializers.load_npz(train_params.load_snapshot, trainer)
     trainer.run()
     chainer.serializers.save_npz(os.path.join(output_params.root_dir, output_params.final_model_name), model)
-
+    model.save_embed()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
