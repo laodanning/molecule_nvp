@@ -5,7 +5,7 @@ import chainer.functions as F
 from model.atom_embed.atom_embed import atom_embed_model
 from model.hyperparameter import Hyperparameter
 from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
-    AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling
+    AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling, LatentTransCoupling
 from model.nvp_model.mlp import BasicMLP
 from data.utils import *
 
@@ -58,16 +58,18 @@ class MoleculeNVPModel(chainer.Chain):
                                   batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.mlp_channels)
                 for i in range(self.hyperparams.num_coupling["relation"])])
             self.clinks = chainer.ChainList(*clinks)
-            if self.adj_size > 512:
-                latent_trans_layers = [512, self.adj_size]
-            else:
-                latent_trans_layers = [self.adj_size, self.adj_size]
-            self.latent_trans = BasicMLP(latent_trans_layers, in_size=self.x_size)
+            self.latent_trans = LatentTransCoupling(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features, 
+                                                    self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.mlp_channels)
+            # if self.adj_size > 512:
+            #     latent_trans_layers = [512, self.adj_size]
+            # else:
+            #     latent_trans_layers = [self.adj_size, self.adj_size]
+            # self.latent_trans = BasicMLP(latent_trans_layers, in_size=self.x_size)
 
         # load and fix embed model
         chainer.serializers.load_npz(
             self.hyperparams.embed_model_path, self.embed_model)
-        #self.embed_model.disable_update()
+        self.embed_model.disable_update()
         self.word_channel_stds = self.embed_model.word_channel_stds()
 
     def __call__(self, x, adj):
@@ -106,6 +108,8 @@ class MoleculeNVPModel(chainer.Chain):
         for i in range(self.hyperparams.num_coupling["feature"], len(self.clinks)):
             adj, log_det_jacobians = self.clinks[i](adj)
             sum_log_det_jacobian_adj += log_det_jacobians
+        adj, log_det_jacobians = self.latent_trans(h, adj)
+        sum_log_det_jacobian_adj += log_det_jacobians
 
         adj = F.reshape(adj, (adj.shape[0], -1))
         h = F.reshape(h, (h.shape[0], -1))
@@ -124,14 +128,15 @@ class MoleculeNVPModel(chainer.Chain):
         batch_size = z.shape[0]
         with chainer.no_backprop_mode():
             z_x, z_adj = F.split_axis(chainer.as_variable(z), [self.x_size], 1)
-            if norm_sample: 
-                z_adj += self.latent_trans(z_x)
+            h_x = F.reshape(
+                z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
 
             if true_adj is None:
                 h_adj = F.reshape(z_adj, (batch_size, self.hyperparams.num_edge_types,
                                           self.hyperparams.num_nodes, self.hyperparams.num_nodes))
 
                 # First, the adjacency coupling layers are applied in reverse order to get h_adj
+                h_adj, _ = self.latent_trans.reverse(h_x, h_adj)
                 for i in reversed(range(self.hyperparams.num_coupling["feature"], len(self.clinks))):
                     h_adj, _ = self.clinks[i].reverse(h_adj)
 
@@ -149,8 +154,6 @@ class MoleculeNVPModel(chainer.Chain):
                 adj = true_adj
             
             adj_forward = adj + self.xp.eye(self.hyperparams.num_nodes) if self.add_self_loop else adj
-            h_x = F.reshape(
-                z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
 
             # feature coupling layers
             for i in reversed(range(self.hyperparams.num_coupling["feature"])):
@@ -164,11 +167,11 @@ class MoleculeNVPModel(chainer.Chain):
     def log_prob(self, z, log_det_jacobians):
         adj_ln_var = self.adj_ln_var * self.xp.ones([self.adj_size])
         x_ln_var = self.x_ln_var * self.xp.ones([self.x_size])
-        zA_mean = self.latent_trans(z[0])
         log_det_jacobians[0] = log_det_jacobians[0] - self.x_size
         log_det_jacobians[1] = log_det_jacobians[1] - self.adj_size
 
-        negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], zA_mean, adj_ln_var, reduce="no"), axis=1) - log_det_jacobians[1])
+        negative_log_likelihood_adj = F.average(F.sum(F.gaussian_nll(z[1], self.xp.zeros(
+            self.adj_size, dtype=self.xp.float32), adj_ln_var, reduce="no"), axis=1) - log_det_jacobians[1])
         negative_log_likelihood_x = F.average(F.sum(F.gaussian_nll(z[0], self.xp.zeros(
             self.x_size, dtype=self.xp.float32), x_ln_var, reduce="no"), axis=1) - log_det_jacobians[0])
 

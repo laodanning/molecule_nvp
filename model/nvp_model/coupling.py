@@ -38,6 +38,56 @@ class Coupling(chainer.Chain):
             self.cal_mask = cuda.to_cpu(self.cal_mask)
 
 
+class LatentTransCoupling(chainer.Chain):
+    """
+    A -> z_A, X -> z_X
+    s, t = f(z_X)
+    z_A' = s * z_A + t
+    z_X ~ N(0, \sigma_X)
+    z_A' ~ N(0, \sigma_A)
+    """
+    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None):
+        super().__init__()
+        self.n_nodes = n_nodes
+        self.n_relations = n_relations
+        self.n_features = n_features
+        self.apply_bn = batch_norm
+        self.ch_list = ch_list
+        self.adj_size = self.n_nodes * self.n_nodes * self.n_relations
+        self.x_size = self.n_nodes * self.n_features
+
+        with self.init_scope():
+            self.mlp = BasicMLP(ch_list, in_size=self.x_size, activation=F.relu)
+            self.linear = L.Linear(ch_list[-1], out_size=2 * self.adj_size, initialW=1e-10)
+            self.scale_factor = chainer.Parameter(initializer=0., shape=[1])
+            self.batch_norm = L.BatchNormalization(self.x_size)
+
+    def __call__(self, x, adj):
+        log_s, t = self._s_t_functions(x)
+        s = F.sigmoid(log_s + 2)
+        log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=(1, 2, 3))
+        adj = adj * s + t
+        return adj, log_det_jacobian
+    
+    def reverse(self, x, adj):
+        log_s, t = self._s_t_functions(x)
+        s = F.sigmoid(log_s + 2)
+        adj = (adj - t) / s
+        return adj, None
+
+    def _s_t_functions(self, x):
+        # x (batch_size, n_node, n_feature)
+        x = F.reshape(x, (x.shape[0], -1))
+        if self.apply_bn:
+            x = self.batch_norm(x)
+        y = F.tanh(self.mlp(x))
+        y = self.linear(y) * F.exp(self.scale_factor * 2)
+        s = y[:, :self.adj_size]
+        t = y[:, self.adj_size:]
+        s = F.reshape(s, [y.shape[0], self.n_relations, self.n_nodes, self.n_nodes])
+        t = F.reshape(t, [y.shape[0], self.n_relations, self.n_nodes, self.n_nodes])
+        return s, t
+
 class AffineAdjCoupling(Coupling):
     """
     Mask of adjacency matrix: a boolean ndarray with size (R,)
