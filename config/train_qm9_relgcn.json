@@ -43,14 +43,21 @@
         "mlp_channels": [256, 256],
         "additive_feature_coupling": false,
         "additive_relation_coupling": false,
-        "feature_noise_scale": 0.01,
-        "initial_z_var": 0.1
+        "feature_noise_scale": 0.001,
+        "initial_z_var": 1,
+        "latent_coupling_layers": [3, 3, 3],
+        "latent_coupling_ch_list": 
+        {
+            "x": [128, 64],
+            "adj": [256, 256]
+        },
+        "apply_shuffle": true
     },
     "train":
     {
         "device": 0,
-        "batch_size": 256,
-        "num_epoch": 200,
+        "batch_size": 1024,
+        "num_epoch": 100,
         "save_epoch": 10,
         "optimizer": "adam",
         "two_step": true,

@@ -5,7 +5,7 @@ import chainer.functions as F
 from model.atom_embed.atom_embed import atom_embed_model
 from model.hyperparameter import Hyperparameter
 from model.nvp_model.coupling import AffineAdjCoupling, AdditiveAdjCoupling, \
-    AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling, LatentTransCoupling
+    AffineNodeFeatureCoupling, AdditiveNodeFeatureCoupling, LatentCouplingBlock
 from model.nvp_model.mlp import BasicMLP
 from data.utils import *
 
@@ -34,11 +34,9 @@ class MoleculeNVPModel(chainer.Chain):
             assert self.embed_model.word_size == self.hyperparams.num_features
             initial_ln_z_var = math.log(self.hyperparams.initial_z_var)
             if self.hyperparams.learn_dist:
-                # self.ln_var = chainer.Parameter(initializer=initial_ln_z_var, shape=[1])
                 self.x_ln_var = chainer.Parameter(initializer=initial_ln_z_var, shape=[1])
                 self.adj_ln_var = chainer.Parameter(initializer=initial_ln_z_var, shape=[1])
             else:
-                # self.ln_var = chainer.Variable(initializer=initial_ln_z_var, shape=[1])
                 self.x_ln_var = chainer.Variable(initializer=initial_ln_z_var, shape=[1])
                 self.adj_ln_var = chainer.Variable(initializer=initial_ln_z_var, shape=[1])
 
@@ -57,14 +55,13 @@ class MoleculeNVPModel(chainer.Chain):
                                                          self.hyperparams.num_edge_types],
                                   batch_norm=self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.mlp_channels)
                 for i in range(self.hyperparams.num_coupling["relation"])])
+            clinks.extend([
+                LatentCouplingBlock(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features, 
+                                    i, self.hyperparams.apply_batchnorm, self.hyperparams.apply_shuffle, 
+                                    self.hyperparams.latent_coupling_ch_list["x"], self.hyperparams.latent_coupling_ch_list["adj"])
+                for i in self.hyperparams.latent_coupling_layers
+            ])
             self.clinks = chainer.ChainList(*clinks)
-            self.latent_trans = LatentTransCoupling(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features, 
-                                                    self.hyperparams.apply_batchnorm, ch_list=self.hyperparams.mlp_channels)
-            # if self.adj_size > 512:
-            #     latent_trans_layers = [512, self.adj_size]
-            # else:
-            #     latent_trans_layers = [self.adj_size, self.adj_size]
-            # self.latent_trans = BasicMLP(latent_trans_layers, in_size=self.x_size)
 
         # load and fix embed model
         chainer.serializers.load_npz(
@@ -105,11 +102,15 @@ class MoleculeNVPModel(chainer.Chain):
             adj += self.xp.random.uniform(0, 0.9, adj.shape)
 
         # forward step for adjacency-coupling layers
-        for i in range(self.hyperparams.num_coupling["feature"], len(self.clinks)):
+        num_prev = self.hyperparams.num_coupling["feature"] + self.hyperparams.num_coupling["relation"]
+        for i in range(self.hyperparams.num_coupling["feature"], num_prev):
             adj, log_det_jacobians = self.clinks[i](adj)
             sum_log_det_jacobian_adj += log_det_jacobians
-        adj, log_det_jacobians = self.latent_trans(h, adj)
-        sum_log_det_jacobian_adj += log_det_jacobians
+        
+        for i in range(num_prev, len(self.clinks)):
+            h, adj, log_det_x, log_det_adj = self.clinks[i](h, adj)
+            sum_log_det_jacobian_adj += log_det_adj
+            sum_log_det_jacobian_x += log_det_x
 
         adj = F.reshape(adj, (adj.shape[0], -1))
         h = F.reshape(h, (h.shape[0], -1))
@@ -128,16 +129,15 @@ class MoleculeNVPModel(chainer.Chain):
         batch_size = z.shape[0]
         with chainer.no_backprop_mode():
             z_x, z_adj = F.split_axis(chainer.as_variable(z), [self.x_size], 1)
-            h_x = F.reshape(
-                z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
+            h_x = F.reshape(z_x, (batch_size, self.hyperparams.num_nodes, self.hyperparams.num_features))
+            h_adj = F.reshape(z_adj, (batch_size, self.hyperparams.num_edge_types, self.hyperparams.num_nodes, self.hyperparams.num_nodes))
+            num_prev = self.hyperparams.num_coupling["feature"] + self.hyperparams.num_coupling["relation"]
+            for i in reversed(range(num_prev, len(self.clinks))):
+                h_x, h_adj = self.clinks[i].reverse(h_x, h_adj)
 
             if true_adj is None:
-                h_adj = F.reshape(z_adj, (batch_size, self.hyperparams.num_edge_types,
-                                          self.hyperparams.num_nodes, self.hyperparams.num_nodes))
-
-                # First, the adjacency coupling layers are applied in reverse order to get h_adj
-                h_adj, _ = self.latent_trans.reverse(h_x, h_adj)
-                for i in reversed(range(self.hyperparams.num_coupling["feature"], len(self.clinks))):
+                # the adjacency coupling layers are applied in reverse order to get h_adj
+                for i in reversed(range(self.hyperparams.num_coupling["feature"], num_prev)):
                     h_adj, _ = self.clinks[i].reverse(h_adj)
 
                 # make adjacency matrix from h_adj
