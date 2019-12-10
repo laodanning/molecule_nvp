@@ -39,17 +39,19 @@ class Coupling(chainer.Chain):
 
 
 class LatentCouplingBlock(chainer.Chain):
-    def __init__(self, num_node, num_relation, num_feature, num_coupling, batch_norm=False, shuffle=True, x_ch_list=None, adj_ch_list=None):
+    def __init__(self, num_node, num_relation, num_feature, num_coupling, batch_norm=False, shuffle=True, x_ch_list=None, adj_ch_list=None, hint_layer=True):
         super().__init__()
         self.num_node = num_node
         self.num_feature = num_feature
         self.num_relation = num_relation
         self.num_coupling = num_coupling
+        self.hint_layer = hint_layer
 
         with self.init_scope():
             self.x_couplings = chainer.ChainList(*[XLatentCoupling(num_node, num_feature, batch_norm, shuffle, x_ch_list) for _ in range(num_coupling)])
             self.adj_couplings = chainer.ChainList(*[AdjLatentCoupling(num_node, num_relation, batch_norm, shuffle, adj_ch_list) for _ in range(num_coupling)])
-            self.hint_coupling = HintCoupling(num_node, num_relation, num_feature, batch_norm, adj_ch_list, x_ch_list)
+            if hint_layer:
+                self.hint_coupling = HintCoupling(num_node, num_relation, num_feature, batch_norm, adj_ch_list, x_ch_list)
     
     def __call__(self, x, adj):
         sum_log_det_x = chainer.as_variable(self.xp.zeros(x.shape[0], dtype=self.xp.float32))
@@ -59,13 +61,15 @@ class LatentCouplingBlock(chainer.Chain):
             adj, log_det_adj = self.adj_couplings[i](adj)
             sum_log_det_adj += log_det_adj
             sum_log_det_x += log_det_x
-        x, adj, log_det_x, log_det_adj = self.hint_coupling(x, adj)
-        sum_log_det_x += log_det_x
-        sum_log_det_adj += log_det_adj
+        if self.hint_layer:
+            x, adj, log_det_x, log_det_adj = self.hint_coupling(x, adj)
+            sum_log_det_x += log_det_x
+            sum_log_det_adj += log_det_adj
         return x, adj, sum_log_det_x, sum_log_det_adj
     
     def reverse(self, x, adj):
-        x, adj = self.hint_coupling.reverse(x, adj)
+        if self.hint_layer:
+            x, adj = self.hint_coupling.reverse(x, adj)
         for i in reversed(range(self.num_coupling)):
             x = self.x_couplings[i].reverse(x)
             adj = self.adj_couplings[i].reverse(adj)
@@ -191,11 +195,11 @@ class HintCoupling(chainer.Chain):
     
     def __call__(self, x, adj):
         adj, log_det_jac_adj = self.adj_hint(x, adj)
-        x, log_det_jac_x = self.x_hint(x, adj)
-        return x, adj, log_det_jac_x, log_det_jac_adj
+        # x, log_det_jac_x = self.x_hint(x, adj)
+        return x, adj, 0, log_det_jac_adj
     
     def reverse(self, x, adj):
-        x = self.x_hint.reverse(x, adj)
+        # x = self.x_hint.reverse(x, adj)
         adj = self.adj_hint.reverse(x, adj)
         return x, adj
 
@@ -206,7 +210,7 @@ class XHintCoupling(chainer.Chain):
     s, t = f(z_A)
     z_X' = s * z_X + t
     """
-    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None):
+    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None, additive=True):
         super().__init__()
         self.n_nodes = n_nodes
         self.n_relations = n_relations
@@ -215,24 +219,37 @@ class XHintCoupling(chainer.Chain):
         self.ch_list = ch_list
         self.adj_size = self.n_nodes * self.n_nodes * self.n_relations
         self.x_size = self.n_nodes * self.n_features
+        self.additive = additive
 
         with self.init_scope():
             self.mlp = BasicMLP(ch_list, in_size=self.adj_size, activation=F.relu)
-            self.linear = L.Linear(ch_list[-1], out_size=2 * self.x_size, initialW=1e-10)
+            if additive:
+                self.linear = L.Linear(ch_list[-1], out_size=self.x_size, initialW=1e-10)
+            else:
+                self.linear = L.Linear(ch_list[-1], out_size=2 * self.x_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0., shape=[1])
             self.batch_norm = L.BatchNormalization(self.adj_size)
         
     def __call__(self, x, adj):
-        log_s, t = self._s_t_functions(adj)
-        s = F.sigmoid(log_s + 2)
-        log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=(1, 2))
-        x = x * s + t
+        if self.additive:
+            t = self._s_t_functions(adj)
+            log_det_jacobian = chainer.Variable(self.xp.array(0., dtype="float32"))
+            x += t
+        else:
+            log_s, t = self._s_t_functions(adj)
+            s = F.sigmoid(log_s + 2)
+            log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=(1, 2))
+            x = x * s + t
         return x, log_det_jacobian
     
     def reverse(self, x, adj):
-        log_s, t = self._s_t_functions(adj)
-        s = F.sigmoid(log_s + 2)
-        x = (x - t) / s
+        if self.additive:
+            t = self._s_t_functions(adj)
+            x -= t
+        else:
+            log_s, t = self._s_t_functions(adj)
+            s = F.sigmoid(log_s + 2)
+            x = (x - t) / s
         return x
 
     def _s_t_functions(self, adj):
@@ -242,11 +259,15 @@ class XHintCoupling(chainer.Chain):
             x = self.batch_norm(x)
         y = F.tanh(self.mlp(x))
         y = self.linear(y) * F.exp(self.scale_factor * 2)
-        s = y[:, :self.x_size]
-        t = y[:, self.x_size:]
-        s = F.reshape(s, [y.shape[0], self.n_nodes, self.n_features])
-        t = F.reshape(t, [y.shape[0], self.n_nodes, self.n_features])
-        return s, t
+        if self.additive:
+            y = F.reshape(y, [y.shape[0], self.n_nodes, self.n_features])
+            return y
+        else:
+            s = y[:, :self.x_size]
+            t = y[:, self.x_size:]
+            s = F.reshape(s, [y.shape[0], self.n_nodes, self.n_features])
+            t = F.reshape(t, [y.shape[0], self.n_nodes, self.n_features])
+            return s, t
 
 class AdjHintCoupling(chainer.Chain):
     """
@@ -254,7 +275,7 @@ class AdjHintCoupling(chainer.Chain):
     s, t = f(z_X)
     z_A' = s * z_A + t
     """
-    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None):
+    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None, additive=True):
         super().__init__()
         self.n_nodes = n_nodes
         self.n_relations = n_relations
@@ -263,24 +284,37 @@ class AdjHintCoupling(chainer.Chain):
         self.ch_list = ch_list
         self.adj_size = self.n_nodes * self.n_nodes * self.n_relations
         self.x_size = self.n_nodes * self.n_features
+        self.additive = additive
 
         with self.init_scope():
             self.mlp = BasicMLP(ch_list, in_size=self.x_size, activation=F.relu)
-            self.linear = L.Linear(ch_list[-1], out_size=2 * self.adj_size, initialW=1e-10)
+            if additive:
+                self.linear = L.Linear(ch_list[-1], out_size=self.adj_size, initialW=1e-10)
+            else:
+                self.linear = L.Linear(ch_list[-1], out_size=2 * self.adj_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0., shape=[1])
             self.batch_norm = L.BatchNormalization(self.x_size)
 
     def __call__(self, x, adj):
-        log_s, t = self._s_t_functions(x)
-        s = F.sigmoid(log_s + 2)
-        log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=(1, 2, 3))
-        adj = adj * s + t
+        if self.additive:
+            t = self._s_t_functions(x)
+            log_det_jacobian = chainer.Variable(self.xp.array(0., dtype="float32"))
+            adj = adj + t
+        else:
+            log_s, t = self._s_t_functions(x)
+            s = F.sigmoid(log_s + 2)
+            log_det_jacobian = F.sum(F.log(F.absolute(s)), axis=(1, 2, 3))
+            adj = adj * s + t
         return adj, log_det_jacobian
     
     def reverse(self, x, adj):
-        log_s, t = self._s_t_functions(x)
-        s = F.sigmoid(log_s + 2)
-        adj = (adj - t) / s
+        if self.additive:
+            t = self._s_t_functions(x)
+            adj -= t
+        else:
+            log_s, t = self._s_t_functions(x)
+            s = F.sigmoid(log_s + 2)
+            adj = (adj - t) / s
         return adj
 
     def _s_t_functions(self, x):
@@ -290,11 +324,15 @@ class AdjHintCoupling(chainer.Chain):
             x = self.batch_norm(x)
         y = F.tanh(self.mlp(x))
         y = self.linear(y) * F.exp(self.scale_factor * 2)
-        s = y[:, :self.adj_size]
-        t = y[:, self.adj_size:]
-        s = F.reshape(s, [y.shape[0], self.n_relations, self.n_nodes, self.n_nodes])
-        t = F.reshape(t, [y.shape[0], self.n_relations, self.n_nodes, self.n_nodes])
-        return s, t
+        if self.additive:
+            y = F.reshape(y, [y.shape[0], self.n_relations, self.n_nodes, self.n_nodes])
+            return y
+        else:
+            s = y[:, :self.adj_size]
+            t = y[:, self.adj_size:]
+            s = F.reshape(s, [y.shape[0], self.n_relations, self.n_nodes, self.n_nodes])
+            t = F.reshape(t, [y.shape[0], self.n_relations, self.n_nodes, self.n_nodes])
+            return s, t
 
 class AffineAdjCoupling(Coupling):
     """

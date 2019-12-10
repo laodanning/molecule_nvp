@@ -59,8 +59,11 @@ class MoleculeNVPModel(chainer.Chain):
                 LatentCouplingBlock(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features, 
                                     i, self.hyperparams.apply_batchnorm, self.hyperparams.apply_shuffle, 
                                     self.hyperparams.latent_coupling_ch_list["x"], self.hyperparams.latent_coupling_ch_list["adj"])
-                for i in self.hyperparams.latent_coupling_layers
+                for i in self.hyperparams.latent_coupling_layers[:-1]
             ])
+            clinks.append(LatentCouplingBlock(self.hyperparams.num_nodes, self.hyperparams.num_edge_types, self.hyperparams.num_features, 
+                                              self.hyperparams.latent_coupling_layers[-1], self.hyperparams.apply_batchnorm, self.hyperparams.apply_shuffle, 
+                                              self.hyperparams.latent_coupling_ch_list["x"], self.hyperparams.latent_coupling_ch_list["adj"], hint_layer=False))
             self.clinks = chainer.ChainList(*clinks)
 
         # load and fix embed model
