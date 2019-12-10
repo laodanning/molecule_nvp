@@ -90,7 +90,8 @@ class AdjLatentCoupling(chainer.Chain):
 
         with self.init_scope():
             self.mlp = BasicMLP(ch_list, in_size=self.in_size, activation=F.relu)
-            self.shuffle_idx = chainer.Parameter(self.xp.random.permutation(num_relation).astype(self.xp.int))
+            self.shuffle_idx = self.xp.random.permutation(num_relation).astype(self.xp.int)
+            self.add_persistent("{}.shuffle_idx".format(self.name), self.shuffle_idx)
             self.linear = L.Linear(ch_list[-1], out_size=2 * self.out_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0., shape=[1])
             self.batch_norm = L.BatchNormalization(self.in_size)
@@ -141,7 +142,8 @@ class XLatentCoupling(chainer.Chain):
 
         with self.init_scope():
             self.mlp = BasicMLP(ch_list, in_size=self.in_size, activation=F.relu)
-            self.shuffle_idx = chainer.Parameter(self.xp.random.permutation(num_feature).astype(self.xp.int))
+            self.shuffle_idx = self.xp.random.permutation(num_feature).astype(self.xp.int)
+            self.add_persistent("{}.shuffle_idx".format(self.name), self.shuffle_idx)
             self.linear = L.Linear(ch_list[-1], out_size=2 * self.out_size, initialW=1e-10)
             self.scale_factor = chainer.Parameter(initializer=0., shape=[1])
             self.batch_norm = L.BatchNormalization(self.in_size)
