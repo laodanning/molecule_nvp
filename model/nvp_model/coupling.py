@@ -210,7 +210,7 @@ class XHintCoupling(chainer.Chain):
     s, t = f(z_A)
     z_X' = s * z_X + t
     """
-    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None, additive=True):
+    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None, additive=False):
         super().__init__()
         self.n_nodes = n_nodes
         self.n_relations = n_relations
@@ -275,7 +275,7 @@ class AdjHintCoupling(chainer.Chain):
     s, t = f(z_X)
     z_A' = s * z_A + t
     """
-    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None, additive=True):
+    def __init__(self, n_nodes, n_relations, n_features, batch_norm=False, ch_list=None, additive=False):
         super().__init__()
         self.n_nodes = n_nodes
         self.n_relations = n_relations
