@@ -30,8 +30,8 @@
         "apply_batchnorm": true,
         "num_coupling":
         {
-            "feature": 40,
-            "relation": 40
+            "feature": 10,
+            "relation": 12
         },
         "gnn_type": "relgcn",
         "gnn_params": {
@@ -44,7 +44,14 @@
         "additive_feature_coupling": false,
         "additive_relation_coupling": false,
         "feature_noise_scale": 0.01,
-        "initial_z_var": 0.1
+        "initial_z_var": 0.1,
+        "latent_coupling_layers": [30],
+        "latent_coupling_ch_list": 
+        {
+            "x": [256, 64],
+            "adj": [1024, 512]
+        },
+        "apply_shuffle": true
     },
     "train":
     {
