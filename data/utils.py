@@ -61,28 +61,40 @@ def get_atomic_num_id(file_path):
     return data
 
 
-def generate_mols(model: chainer.Chain, temp=0.5, z_mu=None, batch_size=20, true_adj=None, device=-1):
-    """
+def check_validity_with_label(x, adj, atomic_num_list, device=-1):
+    adj = _to_numpy_array(adj, device)
+    x = _to_numpy_array(x, device)
+    valid = [valid_mol(construct_mol(x_elem, adj_elem, atomic_num_list))
+             for x_elem, adj_elem in zip(x, adj)]
+    labels = list(map(lambda m: 1.0 if m is not None else 0.0, valid))
+    if device >= 0:
+        labels = chainer.backends.cuda.cupy.array(labels, dtype=chainer.backends.cuda.cupy.float32)
+    else:
+        labels = np.array(labels, dtype=np.float32)
+    return labels
 
-    :param model: GraphNVP model
+
+def generate_mols(model: chainer.Chain, temp=0.5, z_mu=None, batch_size=20, true_adj=None, no_bp=False, device=-1):
+    """
+    :param model: NVP model
     :param z_mu: latent vector of a molecule
     :param batch_size:
     :param true_adj:
-    :param gpu:
+    :param device:
     :return:
     """
+    z_dim = model.latent_size
     device_obj = chainer.backend.get_device(device)
     xp = device_obj.xp
-    z_dim = model.adj_size + model.x_size
-    mu = xp.zeros([z_dim], dtype=xp.float32)
+    mu = model.mean
     sigma_diag = xp.ones([z_dim])
 
-    if model.hyperparams.learn_dist:
+    if model.learn_var:
         sigma_diag = xp.sqrt(xp.exp(model.ln_var.data))
-
     sigma = temp * sigma_diag
 
-    with chainer.no_backprop_mode():
+    with_context = chainer.no_backprop_mode() if no_bp else chainer.force_backprop_mode()
+    with with_context:
         if z_mu is not None:
             mu = z_mu
             sigma = 0.01 * xp.eye(z_dim, dtype=xp.float32)
@@ -336,6 +348,15 @@ def pickle_save(path, obj):
 
 def load_periodic_table(path="./config/elementlist.csv"):
     return pd.read_csv(path, names=["atomic_id", "symbol", "name"], index_col=0)
+
+def check_reverse(x1, x2):
+    xp = chainer.backends.cuda.get_array_module(x1)
+    # x1 = x1.array if isinstance(x1, chainer.Variable) else x1
+    # x2 = x2.array if isinstance(x1, chainer.Variable) else x2
+    x1 = chainer.as_variable(x1)
+    x2 = chainer.as_variable(x2)
+    diff = chainer.functions.absolute(x1 - x2)
+    return xp.prod(diff.array < 1e-5).astype(bool)
 
 if __name__ == "__main__":
     N = 3

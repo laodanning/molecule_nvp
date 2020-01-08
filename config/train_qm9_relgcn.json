@@ -22,42 +22,63 @@
     },
     "model":
     {
-        "embed_model_path": "./output/qm9/final_embed_model.npz",
-        "embed_model_hyper": "./output/qm9/atom_embed_model_hyper.json",
-        "num_edge_types": 4,
-        "num_features": 8,
-        "num_nodes": 9,
-        "apply_batchnorm": true,
-        "num_coupling":
+        "molecule_nvp_params": 
         {
-            "feature": 32,
-            "relation": 28
+            "max_atom_types": 5,
+            "embed_model_path": "./output/qm9/final_embed_model.npz",
+            "embed_model_hyper": "./output/qm9/atom_embed_model_hyper.json",
+            "num_edge_types": 4,
+            "num_features": 5,
+            "num_nodes": 9,
+            "apply_batchnorm": true,
+            "num_coupling":
+            {
+                "feature": 36,
+                "relation": 27
+            },
+            "gnn_type": "relgcn",
+            "gnn_params": {
+                "ch_list": [16, 64],
+                "scale_adj": true
+            },
+            "gnn_fc_channels": [128, 64],
+            "learn_dist": true,
+            "mlp_channels": [256, 256],
+            "additive_feature_coupling": false,
+            "additive_relation_coupling": false,
+            "feature_noise_scale": 0.001,
+            "initial_z_var": 1,
+            "latent_coupling_layers": [4, 4, 4, 4, 4, 4],
+            "latent_coupling_ch_list": 
+            {
+                "x": [128, 64],
+                "adj": [256, 256]
+            },
+            "apply_shuffle": true,
+            "num_shuffle_blocks": 0,
+            "block_params":
+            {
+                "num_x_couplings": 2,
+                "num_A_couplings": 2,
+                "x_ch_list": [128, 64],
+                "A_ch_list": [256, 256]
+            }
         },
-        "gnn_type": "relgcn",
-        "gnn_params": {
-            "ch_list": [16, 64],
-            "scale_adj": true
-        },
-        "gnn_fc_channels": [128, 64],
-        "learn_dist": true,
-        "mlp_channels": [256, 256],
-        "additive_feature_coupling": false,
-        "additive_relation_coupling": false,
-        "feature_noise_scale": 0.001,
-        "initial_z_var": 1,
-        "latent_coupling_layers": [3, 3, 3],
-        "latent_coupling_ch_list": 
+        "latent_nvp_params": 
         {
-            "x": [128, 64],
-            "adj": [256, 256]
-        },
-        "apply_shuffle": true
+            "channel_size": 396,
+            "ch_list": [256, 256],
+            "learn_var": true,
+            "num_coupling_layers": 10
+        }
     },
     "train":
     {
         "device": 0,
-        "batch_size": 1024,
-        "num_epoch": 100,
+        "batch_size": 512,
+        "num_epoch": 50,
+        "second_num_iter": 1000,
+        "second_check_every": 100,
         "save_epoch": 10,
         "optimizer": "adam",
         "two_step": true,

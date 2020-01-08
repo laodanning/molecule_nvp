@@ -3,7 +3,7 @@ from chainer import optimizers
 import chainer
 import chainer.backends.cuda as cuda
 import chainer.functions as F
-from model.nvp_model.nvp_model import MoleculeNVPModel
+from model.nvp_model.molecule_nvp import MoleculeNVPModel
 
 def get_and_log(config, key, default_value=None, required=False):
     value = config.get(key, default_value)
@@ -44,3 +44,10 @@ def load_model_from(path: str, model_params) -> chainer.Chain:
         chainer.serializers.load_npz(
             path, model, path="updater/optimizer:main/", strict=False)
     return model
+
+def get_device_id(device):
+    if type(device) is chainer.backends.cuda.GpuDevice:
+        return device.device.id
+    if device.name == "@numpy": 
+        return -1
+    return int(device.name.split(":")[-1])

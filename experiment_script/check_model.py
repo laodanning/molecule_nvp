@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from model.atom_embed import atom_embed
 from model.hyperparameter import Hyperparameter
-from model.nvp_model.nvp_model import MoleculeNVPModel
+from model.nvp_model.molecule_nvp import MoleculeNVPModel
 from data.utils import generate_mols, check_validity, get_atomic_num_id, \
     check_novelty, get_validation_idxs, adj_to_smiles, load_dataset
 from chainer_chemistry.datasets import NumpyTupleDataset

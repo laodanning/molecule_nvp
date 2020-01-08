@@ -72,6 +72,8 @@ class AtomEmbed(chainer.Chain):
         word_norms = self.xp.linalg.norm(word_matrix.array, axis=-1)
         x_norms = self.xp.linalg.norm(x.array, axis=-1)
         norms = self.xp.matmul(x_norms.reshape(x.shape[0], x.shape[1], 1), word_norms.reshape(1, self.num_atom_type))
+        temp = inner_prod_matrix / norms
+        temp2 = F.argmax(temp, axis=-1)
         return F.argmax(inner_prod_matrix / norms, axis=-1)
 
     def get_word_channel_stds(self):

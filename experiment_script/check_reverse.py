@@ -9,7 +9,7 @@ from chainer_chemistry.datasets import NumpyTupleDataset
 
 from data.utils import *
 from model.hyperparameter import Hyperparameter
-from model.nvp_model.nvp_model import MoleculeNVPModel
+from model.nvp_model.molecule_nvp import MoleculeNVPModel
 from model.utils import load_model_from
 
 if __name__ == "__main__":
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         dataset, 0, n_train, order=train_idxs)
     raw_smiles = adj_to_smiles(dataset, atomic_num_list)
 
-    np.random.seed(1)
+    # np.random.seed(1)
     mol_index = np.random.randint(0, len(dataset))
     x = np.expand_dims(dataset[mol_index][0], axis=0)
     adj = np.expand_dims(dataset[mol_index][1], axis=0)
@@ -62,6 +62,8 @@ if __name__ == "__main__":
         x = chainer.backends.cuda.to_cpu(x)
     else:
         z0 = np.hstack((z0[0].data, z0[1].data))
+    print(z0)
+    print(np.mean(z0))
     rx, radj = model.reverse(z0, norm_sample=False)
     rx.to_cpu()
     radj.to_cpu()
@@ -75,6 +77,10 @@ if __name__ == "__main__":
     print(np.array_equal(radj, adj))
     log.debug(adj)
     log.debug(radj)
+    log.debug(x)
+    log.debug(rx)
     log.debug(np.equal(adj, radj))
+    log.debug(np.equal(x, rx))
+    log.debug(model.embed_model.embed.embed.W)
 
 

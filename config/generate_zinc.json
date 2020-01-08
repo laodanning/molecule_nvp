@@ -14,7 +14,7 @@
     "num_experiments": 5,
     "temperature": 0.72,
     "seed": null,
-    "debug": true,
-    "save_fig": true,
+    "debug": false,
+    "save_fig": false,
     "draw_neighbor": true
 }

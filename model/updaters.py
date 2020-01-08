@@ -5,6 +5,8 @@ from data.utils import molecule_id_converter
 from chainer import cuda
 import six
 from chainer import function
+from data.utils import generate_mols, check_validity_with_label
+from model.utils import get_device_id
 from functools import reduce
 
 
@@ -38,13 +40,43 @@ class AtomEmbedUpdater(training.StandardUpdater):
         loss.backward()
         optimizer.update()
 
+class LatentNVPUpdater(object):
+    def __init__(self, model, optimizer, device=None, 
+                 batch_size=None, atomic_num_list=None):
+        # self.model: NVPModel, consisting of MoleculeNVP model and LatentNVP model
+        # this updater only update LatentNVP part
+        self.model = model
+        self.optimizer = optimizer
+        self.optimizer.setup(model.latent_nvp)
+        self.batch_size = batch_size if batch_size is not None else 32
+        self.atomic_num_list = atomic_num_list
+        self.device = device
+    
+    def update(self):
+        # first random sample from moleculeNVP's latent space
+        molecule_nvp = self.model.molecule_nvp
+        latent_nvp = self.model.latent_nvp
+        latent_samples = molecule_nvp.random_sample_latent(self.batch_size)
 
-class NVPUpdater(training.StandardUpdater):
+        # next get labels
+        x, adj = molecule_nvp.reverse(latent_samples)
+        labels = check_validity_with_label(x, adj, self.atomic_num_list, self.device)
+        pos_degree = self.model.xp.sum(labels) / labels.shape[0]
+
+        z, sum_log_det_jacs = latent_nvp(latent_samples)
+        nll = latent_nvp.nll(z, labels, sum_log_det_jacs)
+        latent_nvp.cleargrads()
+        nll.backward()
+        self.optimizer.update()
+        return {"latent_nll": float(nll.data), "positive_sample_proportion": float(pos_degree)}
+      
+
+class MoleculeNVPUpdater(training.StandardUpdater):
     def __init__(self, iterator, optimizer,
                  converter=molecule_id_converter,
                  device=None, loss_func=None,
                  loss_scale=None, auto_new_epoch=True,
-                 two_step=True, h_nll_weight=1):
+                 two_step=True, h_nll_weight=1, atomic_num_list=None):
         super().__init__(
             iterator, optimizer, converter=converter,
             device=device, loss_func=loss_func,
@@ -53,10 +85,12 @@ class NVPUpdater(training.StandardUpdater):
         self.model = optimizer.target
         self.two_step = two_step
         self.h_nll_weight = h_nll_weight
+        self.atomic_num_list = atomic_num_list
 
     def update_core(self):
         batch = self._iterators["main"].next()
         x, adj = self.converter(batch, self.device)
+        batch_size = x.shape[0]
         z, sum_log_det_jacs = self.model(x, adj)
         optimizer = self._optimizers["main"]
         # negative log likelihood (nll_h, nll_adj)
@@ -77,11 +111,28 @@ class NVPUpdater(training.StandardUpdater):
         loss.backward()
         optimizer.update()
 
+        # reverse valid-training
+        if False:
+            xp = self.model.xp
+            self.model.cleargrads()
+            device_id = get_device_id(self.device)
+            x, adj = generate_mols(self.model, batch_size=batch_size, device=device_id, no_bp=False)
+            x = chainer.functions.cast(x, xp.float32)
+            labels = check_validity_with_label(x, adj, self.atomic_num_list, device=device_id)
+            loss = 1 - xp.average(labels)
+            grads = 1.0 - labels
+            chainer.reporter.report({"valid_loss": loss})
+            adj.grad = xp.ones_like(adj.array) * grads.reshape(batch_size, *(len(adj.shape)-1)*[1]) / (1.0 * self.model.adj_size)
+            x.grad = xp.ones_like(x.array) * grads.reshape(batch_size, *(len(x.shape)-1)*[1]) / (1.0 * self.model.x_size)
+            adj.backward()
+            x.backward()
+            optimizer.update()
+
         if self.auto_new_epoch and self._iterators["main"].is_new_epoch:
             optimizer.new_epoch(auto=True)
 
 
-class DataParallelNVPUpdater(training.ParallelUpdater):
+class DataParallelMoleculeNVPUpdater(training.ParallelUpdater):
     def __init__(self, iterator, optimizer,
                  converter=molecule_id_converter,
                  models=None, devices=None,

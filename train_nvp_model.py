@@ -3,6 +3,7 @@ import json
 import logging as log
 import os
 import random
+from tabulate import tabulate
 
 import chainer
 from chainer import training
@@ -12,8 +13,10 @@ from chainer_chemistry.datasets import NumpyTupleDataset
 from data.utils import get_validation_idxs, generate_mols,\
      check_validity, get_atomic_num_id, save_mol_png, load_periodic_table
 from model.atom_embed.atom_embed import AtomEmbedModel
-from model.nvp_model.nvp_model import MoleculeNVPModel
-from model.updaters import NVPUpdater, DataParallelNVPUpdater
+from model.nvp_model.molecule_nvp import MoleculeNVPModel
+from model.nvp_model.nvp_model import NVPModel
+from model.nvp_model.latent_nvp import LatentNVP
+from model.updaters import MoleculeNVPUpdater, DataParallelMoleculeNVPUpdater, LatentNVPUpdater
 from model.evaluators import AtomEmbedEvaluator
 from model.utils import get_and_log, get_optimizer, set_log_level, get_log_level
 from model.hyperparameter import Hyperparameter
@@ -81,7 +84,9 @@ def train(hyperparams: Hyperparameter):
         valset, train_params.batch_size, repeat=False, shuffle=False)
 
     # -- model -- #
-    model = MoleculeNVPModel(model_params)
+    model = NVPModel(model_params)
+    molecule_model = model.molecule_nvp
+    latent_model = model.latent_nvp
     if isinstance(device, dict):
         log.info("Using multi-GPU {}".format(device))
         model.to_gpu(main_device)
@@ -100,21 +105,22 @@ def train(hyperparams: Hyperparameter):
     else:
         optimizer = opt_gen()
 
-    optimizer.setup(model)
+    optimizer.setup(molecule_model)
     if data_parallel:
-        updater = DataParallelNVPUpdater(
+        updater = DataParallelMoleculeNVPUpdater(
             train_iter,
             optimizer,
             devices=device,
             two_step=train_params.two_step,
             h_nll_weight=train_params.h_nll_weight)
     else:
-        updater = NVPUpdater(
+        updater = MoleculeNVPUpdater(
             train_iter,
             optimizer,
             device=device,
             two_step=train_params.two_step,
-            h_nll_weight=train_params.h_nll_weight)
+            h_nll_weight=train_params.h_nll_weight,
+            atomic_num_list=atomic_num_list)
     trainer = training.Trainer(
         updater, (num_epoch, "epoch"), out=output_params.root_dir)
     if train_params.has("save_epoch"):
@@ -123,14 +129,14 @@ def train(hyperparams: Hyperparameter):
         save_epoch = num_epoch
 
     # -- evaluation function -- #
-    def print_validity(trainer):
+    def print_validity(trainer=None, model=molecule_model):
         with chainer.using_device(chainer.backends.cuda.get_device_from_id(main_device)), chainer.using_config("train", False):
             save_mol = (get_log_level(output_params.log_level) <= log.DEBUG)
             x, adj = generate_mols(model, batch_size=100,
                                 device=main_device)  # x: atom id
             valid_mols = check_validity(
                 x, adj, atomic_num_list=atomic_num_list, device=main_device)
-            if save_mol:
+            if save_mol and trainer is not None:
                 sample_index = random.randint(0, 99)
                 sample = x[sample_index].array
                 sample = chainer.backends.cuda.to_cpu(sample)
@@ -156,8 +162,24 @@ def train(hyperparams: Hyperparameter):
         log.info("Load snapshot from {}".format(train_params.load_snapshot))
         chainer.serializers.load_npz(train_params.load_snapshot, trainer)
     trainer.run()
+
+    # -- second phase training -- #
+    second_optimizer = opt_gen()
+    second_updater = LatentNVPUpdater(model, second_optimizer, device, train_params.batch_size, atomic_num_list)
+    molecule_model.disable_update()
+    num_iter = train_params.second_num_iter
+    check_every = train_params.second_check_every
+    current_iter = 0
+    while current_iter < num_iter:
+        stats_data = second_updater.update()
+        print("iter [{}]: {}".format(current_iter+1, json.dumps(stats_data, indent=4, separators=(',', ':'))))
+        current_iter += 1
+        if (current_iter + 1) % check_every == 0:
+            print_validity(model=model)
+
+    # -- finish training -- #
     chainer.serializers.save_npz(os.path.join(output_params.root_dir, output_params.final_model_name), model)
-    model.save_embed()
+    molecule_model.save_embed()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -3,8 +3,10 @@
     "nvp_hyperparams": "output/qm9/hyperparams_relgcn.json",
     "mol_dataset": "dataset/qm9_relgraph_kekulized.npz",
     "atomic_num_list": "config/atomic_num_qm9.json",
+    "step_size": 0.05,
+    "num_step": 4,
     "target": [
-        {"name": "logPs", "weight": 1.0},
+        {"name": "QEDs", "weight": 1.0},
         {"name": "SA_scores", "weight": 0.5},
         {"name": "cycle_scores", "weight": 0.5}
     ],

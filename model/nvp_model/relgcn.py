@@ -91,7 +91,7 @@ class RelGCNReadout(chainer.Chain):
 
 class RelGCN(chainer.Chain):
 
-    def __init__(self, out_channels=64, num_edge_type=4,
+    def __init__(self, out_channels=64, num_edge_type=4, num_atom_types=MAX_ATOMIC_NUM,
                  activation=F.tanh, gnn_params=None):
 
         super(RelGCN, self).__init__()
@@ -99,10 +99,16 @@ class RelGCN(chainer.Chain):
             gnn_params = {}
         self.ch_list = gnn_params.get("ch_list", [16, 128, 64])
         self.scale_adj = gnn_params.get("scale_adj", False)
+        self.input_type = gnn_params.get("input_type", "float")
         ch_list = self.ch_list
 
         with self.init_scope():
-            self.embed = GraphLinear(None, ch_list[0])
+            if self.input_type == "int":
+                self.embed = EmbedAtomID(out_size=ch_list[0], in_size=num_atom_types)
+            elif self.input_type == "float":
+                self.embed = GraphLinear(None, ch_list[0])
+            else:
+                raise ValueError("[ERROR] Unexpected value input_type={}".format(self.input_type))
             self.rgcn_convs = chainer.ChainList(*[
                 RelGCNUpdate(ch_list[i], ch_list[i+1], num_edge_type) for i in range(len(ch_list)-1)])
             self.rgcn_readout = RelGCNReadout(ch_list[-1], out_channels)

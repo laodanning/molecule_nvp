@@ -9,7 +9,7 @@ from chainer_chemistry.datasets import NumpyTupleDataset
 
 from data.utils import *
 from model.hyperparameter import Hyperparameter
-from model.nvp_model.nvp_model import MoleculeNVPModel
+from model.nvp_model.molecule_nvp import MoleculeNVPModel
 from model.utils import load_model_from
 
 if __name__ == "__main__":
