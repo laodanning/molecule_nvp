@@ -445,7 +445,7 @@ class AffineNodeFeatureCoupling(FixedMaskCoupling):
     """
 
     def __init__(self, num_nodes, num_relations, num_features, mask,
-                 batch_norm=False, coupling_bn=False, ch_list=None, gnn_type="relgcn",
+                 batch_norm=False, num_atom_types=5, coupling_bn=False, ch_list=None, gnn_type="relgcn",
                  gnn_params=None):
         super().__init__(num_nodes, num_relations, num_features, mask, batch_norm=batch_norm)
         self.ch_list = ch_list
@@ -455,7 +455,7 @@ class AffineNodeFeatureCoupling(FixedMaskCoupling):
         assert gnn_type in supported_gnn
         with self.init_scope():
             if gnn_type == "relgcn":
-                self.gnn = RelGCN(out_channels=ch_list[0], num_edge_type=num_relations, gnn_params=gnn_params)
+                self.gnn = RelGCN(out_channels=ch_list[0], num_edge_type=num_relations, num_atom_types=num_atom_types, gnn_params=gnn_params)
             elif gnn_type == "gat":
                 self.gnn = RelationalGAT(
                     out_dim=ch_list[0], n_edge_types=num_relations, hidden_dim=num_features, gnn_params=gnn_params)
@@ -501,7 +501,7 @@ class AffineNodeFeatureCoupling(FixedMaskCoupling):
 
 class AdditiveNodeFeatureCoupling(FixedMaskCoupling):
     def __init__(self, num_nodes, num_relations, num_features, mask,
-                 batch_norm=False, ch_list=None, gnn_type="relgcn",
+                 batch_norm=False, num_atom_types=5, ch_list=None, gnn_type="relgcn",
                  gnn_params=None):
         super().__init__(num_nodes, num_relations, num_features, mask, batch_norm=batch_norm)
         self.ch_list = ch_list
@@ -512,7 +512,7 @@ class AdditiveNodeFeatureCoupling(FixedMaskCoupling):
         assert gnn_type in supported_gnn
         with self.init_scope():
             if gnn_type == "relgcn":
-                self.gnn = RelGCN(out_channels=ch_list[0], num_edge_type=num_relations, gnn_params=gnn_params)
+                self.gnn = RelGCN(out_channels=ch_list[0], num_edge_type=num_relations, num_atom_types=num_atom_types, gnn_params=gnn_params)
             elif gnn_type == "gat":
                 self.gnn = RelationalGAT(
                     out_dim=ch_list[0], n_edge_types=num_relations, hidden_dim=num_features, gnn_params=gnn_params)
